@@ -17,7 +17,8 @@ Design summary (full rationale in docs/architecture.md):
   `PUSH_HANDLER`/`POP_HANDLER`/`CLAUSE_CHECK` maintain. This is not
   backtracking - once a handler jump is taken, any stack mutations the
   failing clause performed before failing are simply discarded by
-  truncating the operand stack back to the recorded depth.
+  truncating the operand stack back to the recorded depth, and the active
+  environment scope is restored to what it was when the handler was pushed.
 """
 
 from __future__ import annotations
@@ -50,7 +51,7 @@ class Frame:
         self.env = env
         self.stack: list = []
         self.pc = 0
-        self.handlers: list[tuple[int, int]] = []  # (target_pc, stack_depth)
+        self.handlers: list[tuple[int, int, Environment]] = []  # (target_pc, stack_depth, env)
 
 
 class VM:
@@ -188,6 +189,14 @@ class VM:
                 elif op == Op.SET_NAME:
                     frame.env.set(instr.arg, stack.pop())
                     frame.pc += 1
+                elif op == Op.PUSH_SCOPE:
+                    frame.env = Environment(parent=frame.env)
+                    frame.pc += 1
+                elif op == Op.POP_SCOPE:
+                    if frame.env.parent is None:
+                        raise VerseRuntimeError("cannot pop root scope", instr.line)
+                    frame.env = frame.env.parent
+                    frame.pc += 1
                 elif op == Op.POP:
                     stack.pop()
                     frame.pc += 1
@@ -206,7 +215,7 @@ class VM:
                 elif op == Op.JUMP_IF_TRUE:
                     frame.pc = instr.arg if stack[-1] is True else frame.pc + 1
                 elif op == Op.PUSH_HANDLER:
-                    frame.handlers.append((instr.arg, len(stack)))
+                    frame.handlers.append((instr.arg, len(stack), frame.env))
                     frame.pc += 1
                 elif op == Op.POP_HANDLER:
                     frame.handlers.pop()
@@ -334,8 +343,9 @@ class VM:
                     raise VerseRuntimeError(f"unimplemented opcode {op}", instr.line)
             except VerseFailure:
                 if frame.handlers:
-                    target, depth = frame.handlers.pop()
+                    target, depth, env = frame.handlers.pop()
                     del stack[depth:]
+                    frame.env = env
                     frame.pc = target
                 else:
                     raise

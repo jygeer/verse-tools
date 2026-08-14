@@ -47,6 +47,7 @@ class _FuncCtx:
     def __init__(self, chunk: Chunk):
         self.chunk = chunk
         self.loop_stack: list[dict] = []
+        self.scope_depth = 0
 
     def emit(self, op: Op, arg=None, line: int = 0) -> int:
         return self.chunk.emit(op, arg, line)
@@ -62,6 +63,18 @@ class _FuncCtx:
 
 
 class Compiler:
+    def _enter_scope(self, ctx: _FuncCtx, line: int = 0):
+        ctx.emit(Op.PUSH_SCOPE, None, line)
+        ctx.scope_depth += 1
+
+    def _exit_scope(self, ctx: _FuncCtx, line: int = 0):
+        ctx.emit(Op.POP_SCOPE, None, line)
+        ctx.scope_depth -= 1
+
+    def _emit_scope_unwind(self, ctx: _FuncCtx, target_depth: int, line: int):
+        for _ in range(max(0, ctx.scope_depth - target_depth)):
+            ctx.emit(Op.POP_SCOPE, None, line)
+
     def compile_program(self, program: A.Program) -> Chunk:
         chunk = Chunk(name="<script>")
         ctx = _FuncCtx(chunk)
@@ -147,11 +160,13 @@ class Compiler:
         elif isinstance(stmt, A.Break):
             if not ctx.loop_stack:
                 raise VerseCompileError("'break' used outside of a loop", stmt.line)
+            self._emit_scope_unwind(ctx, ctx.loop_stack[-1]["scope_depth"], stmt.line)
             idx = ctx.emit(Op.JUMP, None, stmt.line)
             ctx.loop_stack[-1]["break_jumps"].append(idx)
         elif isinstance(stmt, A.Continue):
             if not ctx.loop_stack:
                 raise VerseCompileError("'continue' used outside of a loop", stmt.line)
+            self._emit_scope_unwind(ctx, ctx.loop_stack[-1]["scope_depth"], stmt.line)
             ctx.emit(Op.JUMP, ctx.loop_stack[-1]["continue_target"], stmt.line)
         elif isinstance(stmt, A.Return):
             if stmt.value is not None:
@@ -215,9 +230,12 @@ class Compiler:
         return handler_indices
 
     def _compile_if(self, node: A.If, ctx: _FuncCtx):
+        self._enter_scope(ctx, node.line)
+        scope_depth = ctx.scope_depth
         patch_indices = self._compile_clauses(node.clauses, ctx)
         for s in node.then_branch.statements:
             self._compile_stmt(s, ctx)
+        ctx.emit(Op.POP_SCOPE, None, node.line)
         end_jump = ctx.emit(Op.JUMP, None, node.line)
         fail_target = ctx.here()
         for idx in patch_indices:
@@ -225,12 +243,17 @@ class Compiler:
         if node.else_branch is not None:
             for s in node.else_branch.statements:
                 self._compile_stmt(s, ctx)
+        ctx.emit(Op.POP_SCOPE, None, node.line)
+        ctx.scope_depth = scope_depth - 1
         ctx.patch(end_jump, ctx.here())
 
     def _compile_if_expr(self, node: A.IfExpr, ctx: _FuncCtx):
+        self._enter_scope(ctx, node.line)
+        scope_depth = ctx.scope_depth
         patch_indices = self._compile_clauses(node.clauses, ctx)
         then_expr = node.then_branch.statements[0].expr
         self._compile_expr(then_expr, ctx)
+        ctx.emit(Op.POP_SCOPE, None, node.line)
         end_jump = ctx.emit(Op.JUMP, None, node.line)
         fail_target = ctx.here()
         for idx in patch_indices:
@@ -240,9 +263,12 @@ class Compiler:
             self._compile_expr(else_expr, ctx)
         else:
             ctx.emit(Op.LOAD_CONST, ctx.add_const(VOID), node.line)
+        ctx.emit(Op.POP_SCOPE, None, node.line)
+        ctx.scope_depth = scope_depth - 1
         ctx.patch(end_jump, ctx.here())
 
     def _compile_for(self, node: A.For, ctx: _FuncCtx):
+        self._enter_scope(ctx, node.line)
         self._compile_expr(node.iterable, ctx)
         ctx.emit(Op.GET_ITER, None, node.line)
         for_start = ctx.here()
@@ -254,7 +280,9 @@ class Compiler:
             ctx.emit(Op.POP_HANDLER, None, filt.line)
             ctx.emit(Op.CLAUSE_CHECK, for_start, filt.line)
             ctx.emit(Op.POP, None, filt.line)
-        ctx.loop_stack.append({"continue_target": for_start, "break_jumps": []})
+        ctx.loop_stack.append(
+            {"continue_target": for_start, "break_jumps": [], "scope_depth": ctx.scope_depth}
+        )
         for s in node.body.statements:
             self._compile_stmt(s, ctx)
         ctx.emit(Op.JUMP, for_start, node.line)
@@ -263,10 +291,14 @@ class Compiler:
         loop_ctx = ctx.loop_stack.pop()
         for idx in loop_ctx["break_jumps"]:
             ctx.patch(idx, for_end)
+        self._exit_scope(ctx, node.line)
 
     def _compile_loop(self, node: A.Loop, ctx: _FuncCtx):
+        self._enter_scope(ctx, node.line)
         loop_start = ctx.here()
-        ctx.loop_stack.append({"continue_target": loop_start, "break_jumps": []})
+        ctx.loop_stack.append(
+            {"continue_target": loop_start, "break_jumps": [], "scope_depth": ctx.scope_depth}
+        )
         for s in node.body.statements:
             self._compile_stmt(s, ctx)
         ctx.emit(Op.JUMP, loop_start, node.line)
@@ -274,6 +306,7 @@ class Compiler:
         loop_ctx = ctx.loop_stack.pop()
         for idx in loop_ctx["break_jumps"]:
             ctx.patch(idx, loop_end)
+        self._exit_scope(ctx, node.line)
 
     # -- classes ----------------------------------------------------
     def _compile_class_decl(self, node: A.ClassDecl, ctx: _FuncCtx):
