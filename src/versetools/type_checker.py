@@ -321,9 +321,9 @@ class TypeChecker:
         if isinstance(expr, A.Index):
             obj_type = self._infer_expr_type(expr.obj)
             index_type = self._infer_expr_type(expr.index)
-            if index_type != UNKNOWN and index_type != INT:
-                raise VerseCompileError(f"index must be int, got {format_type(index_type)}", expr.line)
             if isinstance(obj_type, ArrayType):
+                if index_type != UNKNOWN and index_type != INT:
+                    raise VerseCompileError(f"index must be int, got {format_type(index_type)}", expr.line)
                 return obj_type.element_type
             if isinstance(obj_type, MapType):
                 if not self._is_assignable(index_type, obj_type.key_type):
@@ -468,12 +468,6 @@ class TypeChecker:
             raise VerseCompileError(f"cannot add {format_type(left)} and {format_type(right)}", expr.line)
         if expr.op in ("-", "*", "/", "%"):
             if left not in (INT, FLOAT, UNKNOWN) or right not in (INT, FLOAT, UNKNOWN):
-                names = {
-                    "-": "subtract",
-                    "*": "multiply",
-                    "/": "divide",
-                    "%": "compute",
-                }
                 if expr.op == "-":
                     raise VerseCompileError(
                         f"cannot subtract {format_type(right)} from {format_type(left)}",
@@ -661,14 +655,22 @@ class TypeChecker:
         self._push_scope()
         for name, typ in bindings.items():
             self._define(name, typ)
-        then_type = self._infer_expr_type(expr.then_branch.statements[0].expr)
+        then_type = self._block_expr_type(expr.then_branch)
         self._pop_scope()
-        else_type = VOID if expr.else_branch is None else self._infer_expr_type(expr.else_branch.statements[0].expr)
+        else_type = VOID if expr.else_branch is None else self._block_expr_type(expr.else_branch)
         if self._is_assignable(then_type, else_type):
             return else_type
         if self._is_assignable(else_type, then_type):
             return then_type
         return UNKNOWN
+
+    def _block_expr_type(self, block: A.Block) -> Type:
+        if not block.statements:
+            return VOID
+        first = block.statements[0]
+        if not isinstance(first, A.ExprStmt):
+            raise VerseCompileError("expected expression branch", first.line)
+        return self._infer_expr_type(first.expr)
 
     def _member_type(self, obj_type: Type, name: str, line: int, for_assignment: bool = False) -> Type:
         if isinstance(obj_type, TaskType):

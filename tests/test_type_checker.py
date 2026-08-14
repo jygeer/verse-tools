@@ -25,6 +25,10 @@ def test_type_checker_rejects_assignment_type_mismatch():
         check_src('var Count : int = 0\nset Count = "x"\n')
 
 
+def test_type_checker_allows_typed_map_assignment():
+    check_src('var Ages : [string]int = map{"alice" => 1}\nset Ages["bob"] = 2\n')
+
+
 def test_type_checker_rejects_return_type_mismatch():
     with pytest.raises(VerseCompileError, match="cannot return string from int function"):
         check_src('Describe() : int =\n    return "x"\n')
