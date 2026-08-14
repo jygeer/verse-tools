@@ -37,6 +37,15 @@ def test_type_checker_supports_range_annotation():
     check_src("First(R : range) : int =\n    for (N : R):\n        return N\n    return 0\n")
 
 
+def test_type_checker_allows_nested_function_definitions():
+    check_src(
+        "MakeAdder(N : int) : function =\n"
+        "    Inner(X : int) : int =\n"
+        "        return X + N\n"
+        "    return Inner\n"
+    )
+
+
 def test_type_checker_rejects_return_type_mismatch():
     with pytest.raises(VerseCompileError, match="cannot return string from int function"):
         check_src('Describe() : int =\n    return "x"\n')

@@ -156,6 +156,7 @@ class TypeChecker:
             self._check_return(stmt)
             return
         if isinstance(stmt, A.FuncDecl):
+            self._define(stmt.name, self._function_type(stmt.params, stmt.return_type, stmt.line))
             self._check_function(stmt)
             return
         if isinstance(stmt, A.ClassDecl):
@@ -360,6 +361,7 @@ class TypeChecker:
                 if operand in (LOGIC, UNKNOWN):
                     return LOGIC
                 raise VerseCompileError(f"'not' requires logic, got {format_type(operand)}", expr.line)
+            raise VerseCompileError(f"unknown unary operator '{expr.op}'", expr.line)
         if isinstance(expr, A.Binary):
             return self._infer_binary_type(expr)
         if isinstance(expr, A.Logical):
