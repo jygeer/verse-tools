@@ -110,6 +110,12 @@ test/docs bar this repo expects.
   `.verse` example plus expected output, not just an internal unit test -
   see "Risks and open questions" in `docs/roadmap.md` on why the test
   suite is treated as the executable spec here.
+- A new language feature (new syntax, stdlib function, or semantics) needs
+  a runnable example, not just a test: add a `.verse` file to `examples/`
+  (or extend the closest topical one, e.g. `control_flow.verse`,
+  `arrays_and_maps.verse`) that demonstrates it, since `examples/` is the
+  corpus every change is checked against and doubles as user-facing
+  documentation of what's supported.
 - Don't add UEFN/Fortnite/Epic-service integration of any kind - it's an
   explicit non-goal, not just unimplemented (`docs/roadmap.md`'s ground
   rules).

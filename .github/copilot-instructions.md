@@ -40,6 +40,10 @@ pytest
   `for f in examples/*.verse; do verse run "$f" || echo "FAILED: $f"; done`
 - Update `docs/language-reference.md`/`README.md` for any new stdlib
   function, CLI flag, or language feature.
+- Add a `.verse` example to `examples/` for any new syntax, stdlib
+  function, or language feature (or extend the closest topical file, e.g.
+  `control_flow.verse`) - the corpus is run on every change and is
+  user-facing documentation of what's supported.
 
 ## Scope
 

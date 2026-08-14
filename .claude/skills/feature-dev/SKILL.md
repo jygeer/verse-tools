@@ -93,6 +93,10 @@ stale).
   reference/close that issue rather than leaving it orphaned.
 - New stdlib functions, CLI flags, or language features need a mention in
   `README.md` and/or `docs/language-reference.md`.
+- New syntax, stdlib functions, or language semantics also need a runnable
+  example: add a `.verse` file to `examples/` (or extend the closest
+  topical one, e.g. `control_flow.verse`, `arrays_and_maps.verse`) so the
+  feature is exercised by the conformance corpus, not just a unit test.
 
 ## 6. Before considering the feature shippable
 
