@@ -85,6 +85,21 @@ docs/               architecture, language reference, roadmap, differences
   `docs/roadmap.md`, idempotently (matches on the issue title's `[ID]`
   prefix). Run this after editing the roadmap, not manually via `gh issue
   create`, so IDs and labels stay consistent.
+- `review-agent-pr` - vets a PR opened by an autonomous coding agent
+  (GitHub Copilot coding agent or another Claude session) against the
+  same rigor `feature-dev` requires, before it's merged.
+
+## Working with GitHub Copilot coding agent
+
+This repo also uses GitHub Copilot's coding agent to work roadmap issues
+directly (it opens PRs from `copilot/*` branches, authored by
+`app/copilot-swe-agent`). It reads `AGENTS.md` and
+`.github/copilot-instructions.md` (the same rigor as `feature-dev`,
+condensed) automatically, and `.github/workflows/copilot-setup-steps.yml`
+pre-installs `pip install -e ".[dev]"` into its environment. Before
+merging a Copilot-authored PR, run the `review-agent-pr` skill on it - an
+agent PR existing and passing CI isn't the same as it having met the
+test/docs bar this repo expects.
 
 ## Conventions worth knowing
 

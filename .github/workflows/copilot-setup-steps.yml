@@ -1,0 +1,31 @@
+name: "Copilot Setup Steps"
+
+# Pre-installs versetools' dependencies into the Copilot coding agent's
+# ephemeral environment before it starts working, so it doesn't spend
+# agent turns figuring out `pip install -e ".[dev]"` itself. The
+# `copilot-setup-steps` job name and the `workflow_dispatch` trigger are
+# both required by GitHub for this to be picked up; the push/pull_request
+# triggers just let normal CI catch a broken setup step when this file
+# changes.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package
+        run: pip install -e ".[dev]"
