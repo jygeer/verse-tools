@@ -19,6 +19,9 @@ readable implementation of each toolchain stage to learn from.
 in [`docs/differences-from-verse.md`](docs/differences-from-verse.md).
 Read that before assuming any particular real-Verse feature works here.**
 
+> This project was built with [Claude](https://claude.com/product/claude-code),
+> Anthropic's AI coding assistant.
+
 ## Install
 
 ```sh
