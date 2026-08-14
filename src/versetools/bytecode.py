@@ -23,6 +23,8 @@ class Op(Enum):
     LOAD_NAME = auto()
     STORE_NAME = auto()   # introduce a new binding in the current frame
     SET_NAME = auto()     # assign to an existing binding (walks the chain)
+    PUSH_SCOPE = auto()   # create a child environment for block-local bindings
+    POP_SCOPE = auto()    # discard the current child environment
 
     POP = auto()
 

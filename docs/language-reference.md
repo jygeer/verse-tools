@@ -129,11 +129,9 @@ set Player.Health = 100
 set Scores[0] = 10
 ```
 
-**Scoping note:** unlike real Verse (block-scoped), every binding in
-Verse-core is scoped to its *enclosing function* (or the top level),
-regardless of how deeply it's nested inside `if`/`for`/`loop`. A name
-bound inside an `if` is still visible after it, as long as you're still
-in the same function. See the differences doc for why.
+**Scoping note:** bindings are block-scoped. A name introduced with `:=`
+inside an `if`/`for`/`loop` body is visible only inside that block and is
+out of scope after the block ends.
 
 ## Functions
 

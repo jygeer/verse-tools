@@ -210,6 +210,26 @@ def test_set_requires_existing_binding(runner):
         runner.run("set NeverDeclared = 1\n")
 
 
+def test_if_body_binding_is_block_scoped(runner):
+    with pytest.raises(VerseRuntimeError):
+        runner.run("if (true):\n    X := 1\nPrint(ToString(X))\n")
+
+
+def test_if_clause_binding_is_block_scoped(runner):
+    with pytest.raises(VerseRuntimeError):
+        runner.run("if (X := option(1)):\n    Print(ToString(X))\nPrint(ToString(X))\n")
+
+
+def test_for_body_binding_is_block_scoped(runner):
+    with pytest.raises(VerseRuntimeError):
+        runner.run("for (N : 1..1):\n    X := N\nPrint(ToString(X))\n")
+
+
+def test_loop_body_binding_is_block_scoped(runner):
+    with pytest.raises(VerseRuntimeError):
+        runner.run("loop:\n    X := 1\n    break\nPrint(ToString(X))\n")
+
+
 def test_division_by_zero_raises(runner):
     with pytest.raises(VerseRuntimeError):
         runner.run("X := 1 / 0\n")

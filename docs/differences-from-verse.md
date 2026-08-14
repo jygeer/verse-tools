@@ -68,28 +68,6 @@ get is "try once, fail fast, catch with `if`" - which covers the
 overwhelmingly common use of `decides` (optional lookups, validated
 input) but not its full logic-programming generality.
 
-## Variable scoping is function-scoped, not block-scoped
-
-Real Verse bindings are scoped to the block (`if`/`for`/`loop` body)
-they're declared in. Verse-core gives every function call a single flat
-`Environment` (see
-[`architecture.md`](architecture.md#1-variables-are-name-based-not-stack-slot-based)),
-so a name bound inside an `if` remains visible for the rest of the
-*function*, not just inside that `if`:
-
-```verse
-F() : void =
-    if (X := MaybeGet()):
-        Y := X + 1
-    Print(ToString(Y))   # real Verse: compile error, Y out of scope.
-                          # Verse-core: works if the `if` succeeded on
-                          # this call, undefined-name error if it didn't.
-```
-
-This was a deliberate trade for a much simpler compiler and VM (no
-stack-slot allocation, no scope-exit bookkeeping) - see the architecture
-doc for the reasoning.
-
 ## No tail-expression propagation through control flow
 
 Real Verse: the last expression of *any* block - including inside an

@@ -76,17 +76,11 @@ dict with a parent pointer to the lexically enclosing scope
 (`values.py`). `LOAD_NAME`/`STORE_NAME`/`SET_NAME` walk this chain at
 runtime.
 
-This is slower, but it deletes an entire category of compiler
-bookkeeping (slot allocation, upvalue capture lists, closing-over-loop-
-variable edge cases) and makes closures trivial: `MAKE_FUNCTION` just
-captures "whatever `Environment` is current right now" as the new
-function's closure scope. For a teaching/scripting VM this trade is
-worth it; see the note in `bytecode.py`'s module docstring.
-
-One consequence: **bindings are function-scoped, not block-scoped** -
-a `:=` inside an `if` is visible for the rest of the enclosing function,
-not just inside that `if`. Real Verse is block-scoped. This is called
-out in the language reference and the differences doc.
+This is slower than slot indexing, but it still keeps closure capture
+simple: `MAKE_FUNCTION` just captures "whatever `Environment` is current
+right now" as the new function's closure scope. Block scoping is handled
+by creating and discarding child environments (`PUSH_SCOPE`/
+`POP_SCOPE`) around block bodies while still using name-based lookup.
 
 ### 2. Failure is a real exception with an explicit handler stack
 
@@ -98,7 +92,7 @@ backtracking implementations, and effect-typed languages, actually do
 more precisely - see the differences doc for what that costs us).
 
 Each `Frame` (one per function call) carries a small stack of
-`(target_pc, stack_depth)` handlers. Compiling an `if`'s clause list
+`(target_pc, stack_depth, env)` handlers. Compiling an `if`'s clause list
 (`Compiler._compile_clauses` in `compiler.py`) emits:
 
 ```
@@ -113,10 +107,8 @@ STORE_NAME clause_name       ; (or POP, for an unnamed boolean clause)
 If the clause's code raises `VerseFailure`, the VM's dispatch loop
 catches it right there (`_exec_frame`'s `try`/`except VerseFailure`),
 pops the matching handler, **truncates the operand stack back to the
-depth it had when the handler was pushed** (undoing any partial pushes
-the failing expression made), and jumps to `fail_target`. No bindings
-made by earlier statements are undone - only the operand stack, which is
-exactly the state that would otherwise be left inconsistent.
+depth it had when the handler was pushed**, restores the environment to
+the saved scope, and jumps to `fail_target`.
 
 If no handler is active when a `VerseFailure` is raised, it propagates
 out of the frame's generator entirely - which, because ordinary calls
@@ -188,7 +180,7 @@ member has a one-line comment); the categories are:
 
 | Category | Opcodes |
 |---|---|
-| Constants / names | `LOAD_CONST`, `LOAD_NAME`, `STORE_NAME`, `SET_NAME` |
+| Constants / names | `LOAD_CONST`, `LOAD_NAME`, `STORE_NAME`, `SET_NAME`, `PUSH_SCOPE`, `POP_SCOPE` |
 | Stack shuffling | `POP` |
 | Arithmetic / logic | `BINARY_OP`, `UNARY_OP` |
 | Control flow | `JUMP`, `JUMP_IF_FALSE`, `JUMP_IF_TRUE` |
