@@ -80,9 +80,9 @@ Nums := array{
 | a class type | `Point{X := 1, Y := 2}` | see [Classes](#classes) |
 
 `logic` is a distinct type from `int` - `true = 1` is `false`, and
-arithmetic on `true`/`false` is a compile-time-shaped runtime error.
-This matches real Verse's strict typing; it's enforced dynamically here
-rather than statically (see differences doc).
+arithmetic on `true`/`false` is an error. In Verse-core this is enforced
+dynamically by default, or ahead of time with the opt-in checker
+(`verse check <file>` / `verse run --strict`; see differences doc).
 
 ## Operators
 
@@ -110,13 +110,15 @@ strings (`"a" + "b"`) and arrays (`array{1} + array{2}`).
 
 ```verse
 Pi := 3.14159          # constant binding, cannot be reassigned
-X : int = 3            # typed constant binding (same as := but with an
-                        # explicit type annotation - the annotation is
-                        # documentation only, not enforced at runtime)
+X : int = 3            # typed constant binding
 
 var Count : int = 0    # mutable binding
 set Count = Count + 1  # assignment - only valid on a `var` binding
 ```
+
+Type annotations participate in the opt-in static checker: `verse check`
+and `verse run --strict` reject assigning an incompatible value into an
+annotated binding (for example `set Count = "x"` when `Count : int`).
 
 Assigning with `set` to a name that was never declared is a runtime
 error (`RuntimeError: cannot assign to undefined name ...`) - `set`
@@ -172,10 +174,10 @@ Good(X : int) : int =
         return 2
 ```
 
-**Effect specifiers** (`<decides>`, `<transacts>`, ...) are parsed and
-attached to the function for documentation/introspection, but are not
-statically enforced - any function may fail, whether or not it declares
-`<decides>`. See [Failure and options](#failure-and-options).
+**Effect specifiers** (`<decides>`, `<transacts>`, ...) are still parsed
+and attached to the function for documentation/introspection, but are not
+statically enforced yet - any function may fail, whether or not it
+declares `<decides>`. See [Failure and options](#failure-and-options).
 
 ## Control flow
 
