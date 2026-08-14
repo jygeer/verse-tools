@@ -19,7 +19,8 @@ Clamp(Value : int, Lo : int, Hi : int) : int =
     return Value
 
 Main() : void =
-    # Explicit type annotations on immutable bindings.
+    # Explicit type annotations on immutable bindings; the compiler
+    # rejects a non-int RHS for Sum or a non-string RHS for Greeting.
     Sum : int = Add(10, 32)
     Greeting : string = Greet("Verse")
     Print(Greeting)

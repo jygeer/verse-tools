@@ -5,7 +5,7 @@ CountPositives(Values : []int) : int =
     var Total : int = 0
     for (V : Values):
         if (V > 0):
-            var Contribution : int = V * 2  # block-local to the if body
+            var Contribution : int = V * 2  # block-local; not visible outside this if body
             set Total = Total + Contribution
     return Total
 
