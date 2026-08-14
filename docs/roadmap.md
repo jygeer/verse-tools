@@ -98,6 +98,12 @@ compiler/tree-walking-ish VM), because it's about *correctness*, not
 
 ### 1.2 Static type system
 
+**Status:** an initial opt-in checker has landed behind `verse check
+<file>` / `verse run --strict`, covering monomorphic annotations,
+assignments, calls, returns, and basic class/container checking. Effect
+checking, generics, and flipping the checker on by default are still
+remaining work.
+
 - **Goal:** catch type errors (`1 + "x"`, calling a function with the
   wrong argument types, assigning a `string` into an `int` variable) at
   compile time instead of at the moment the bad value is produced (or

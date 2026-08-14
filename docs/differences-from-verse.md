@@ -9,20 +9,25 @@ something isn't mentioned below or in
 [`language-reference.md`](language-reference.md), assume it's not
 supported.
 
-## No static type system or effect checker
+## Static type checking is opt-in; there's still no effect checker
 
 Real Verse is statically typed with a real effect system (`decides`,
 `transacts`, `varies`, `suspends`, ...) checked at compile time - you
 cannot call a `<decides>` function without acknowledging it might fail,
 and the compiler proves it.
 
-Verse-core parses type annotations and effect specifiers and attaches
-them to functions/parameters for introspection (`verse ast`, `verse
-dis`), but **enforces neither** - every function may fail regardless of
-whether it's annotated `<decides>`, and no type is ever checked before a
-program runs. This is the single biggest reason Verse-core is much
-smaller than real Verse: a real effect/type checker is a substantial
-project on its own.
+Verse-core now has an **opt-in** static type checker (`verse check
+<file>` or `verse run --strict <file>`) that catches many first-order
+type mistakes - arithmetic on incompatible types, wrong argument types,
+bad assignments into annotated variables, mismatched return types, and
+class field/constructor mismatches - before the VM runs.
+
+What it still does **not** have is a real effect checker, generic type
+system, or full always-on static typing. Effect specifiers are still only
+parsed/documented metadata, every function may still fail at runtime
+whether or not it declares `<decides>`, and plain `verse run <file>`
+keeps the old dynamic-only behavior for backward compatibility while this
+first cut is still opt-in.
 
 ## Failure propagates in fewer places
 

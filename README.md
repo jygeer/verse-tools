@@ -39,6 +39,10 @@ point in `pyproject.toml`).
 # Run a script (auto-calls a zero-argument Main() if one is defined)
 verse run examples/hello.verse
 
+# Opt-in static type checking
+verse check examples/hello.verse
+verse run examples/hello.verse --strict
+
 # Start the REPL
 verse repl
 
@@ -66,6 +70,12 @@ Hello, Verse!
 More complete examples live in [`examples/`](examples/) - fizzbuzz,
 control flow, arrays/maps, options and decides-effect failure, classes
 with inheritance, and spawn/sync/race concurrency.
+
+`verse check <file>` runs the parser plus the opt-in static type checker
+without executing the program. `verse run --strict <file>` does the same
+check before compiling/running, so obvious type mistakes like `1 + "x"`
+or passing a `string` where a function expects `int` fail at compile time
+instead of at runtime.
 
 ## Documentation
 

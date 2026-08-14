@@ -19,6 +19,7 @@ from .errors import VerseCompileError, VerseFailure, VerseRuntimeError, VerseSyn
 from .lexer import tokenize
 from .parser import parse
 from .repl import Repl
+from .type_checker import check_program
 from .values import VFunction
 from .vm import VM
 
@@ -45,6 +46,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     source = _read_source(args.file)
     program = _parse_or_die(source, args.file)
     try:
+        if args.strict:
+            check_program(program)
         chunk = compile_program(program)
     except VerseCompileError as e:
         print(f"{args.file}: CompileError: {e.message}", file=sys.stderr)
@@ -105,6 +108,17 @@ def cmd_dis(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_check(args: argparse.Namespace) -> int:
+    source = _read_source(args.file)
+    program = _parse_or_die(source, args.file)
+    try:
+        check_program(program)
+    except VerseCompileError as e:
+        print(f"{args.file}: CompileError: {e.message}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="verse", description="An unofficial toolchain for Verse-core")
     sub = p.add_subparsers(dest="command", required=True)
@@ -114,6 +128,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_p.add_argument(
         "--no-main", action="store_true", help="don't auto-call a zero-argument Main()"
     )
+    run_p.add_argument("--strict", action="store_true", help="type-check before running")
     run_p.set_defaults(func=cmd_run)
 
     repl_p = sub.add_parser("repl", help="start the interactive REPL")
@@ -130,6 +145,10 @@ def build_parser() -> argparse.ArgumentParser:
     dis_p = sub.add_parser("dis", help="print compiled bytecode for a file")
     dis_p.add_argument("file")
     dis_p.set_defaults(func=cmd_dis)
+
+    check_p = sub.add_parser("check", help="type-check a .verse file without running it")
+    check_p.add_argument("file")
+    check_p.set_defaults(func=cmd_check)
 
     return p
 
