@@ -667,10 +667,10 @@ class TypeChecker:
     def _block_expr_type(self, block: A.Block) -> Type:
         if not block.statements:
             return VOID
-        first = block.statements[0]
-        if not isinstance(first, A.ExprStmt):
-            raise VerseCompileError("expected expression branch", first.line)
-        return self._infer_expr_type(first.expr)
+        last = block.statements[-1]
+        if not isinstance(last, A.ExprStmt):
+            raise VerseCompileError("expected expression branch", last.line)
+        return self._infer_expr_type(last.expr)
 
     def _member_type(self, obj_type: Type, name: str, line: int, for_assignment: bool = False) -> Type:
         if isinstance(obj_type, TaskType):

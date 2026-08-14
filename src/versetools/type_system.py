@@ -130,6 +130,8 @@ def parse_type_ann(text: str) -> Type:
             "string": STRING,
             "logic": LOGIC,
             "void": VOID,
+            "range": RANGE,
+            "task": TASK,
             "function": FUNCTION,
         }.get(name, ClassType(name))
 
@@ -172,4 +174,3 @@ def format_type(typ: Type) -> str:
     if isinstance(typ, BuiltinType):
         return typ.name
     return type(typ).__name__
-

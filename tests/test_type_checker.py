@@ -29,6 +29,14 @@ def test_type_checker_allows_typed_map_assignment():
     check_src('var Ages : [string]int = map{"alice" => 1}\nset Ages["bob"] = 2\n')
 
 
+def test_type_checker_supports_task_annotation():
+    check_src('UseTask(T : task) : logic =\n    return T.Done\n')
+
+
+def test_type_checker_supports_range_annotation():
+    check_src("First(R : range) : int =\n    for (N : R):\n        return N\n    return 0\n")
+
+
 def test_type_checker_rejects_return_type_mismatch():
     with pytest.raises(VerseCompileError, match="cannot return string from int function"):
         check_src('Describe() : int =\n    return "x"\n')
