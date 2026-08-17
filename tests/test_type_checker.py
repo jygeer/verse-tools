@@ -59,3 +59,99 @@ def test_type_checker_allows_decides_false_return():
         "    else:\n"
         "        return false\n"
     )
+
+
+# ---------------------------------------------------------------- effect system tests
+
+def test_effect_decides_call_inside_if_clause_is_ok():
+    """Calling a <decides> function inside an if clause is valid (guarded)."""
+    check_src(
+        "MayFail()<decides> : int =\n"
+        "    return 1\n"
+        "Main() : void =\n"
+        "    if (X := MayFail()):\n"
+        "        Print(ToString(X))\n"
+    )
+
+
+def test_effect_decides_call_in_decides_function_is_ok():
+    """Calling a <decides> function from a <decides> function propagates failure."""
+    check_src(
+        "MayFail()<decides> : int =\n"
+        "    return 1\n"
+        "AlsoFails()<decides> : int =\n"
+        "    return MayFail()\n"
+    )
+
+
+def test_effect_unguarded_decides_call_outside_decides_is_error():
+    """Calling a <decides> function in a non-decides function body is a compile error."""
+    with pytest.raises(VerseCompileError, match="<decides>"):
+        check_src(
+            "MayFail()<decides> : int =\n"
+            "    return 1\n"
+            "Main() : void =\n"
+            "    X := MayFail()\n"
+        )
+
+
+def test_effect_decides_call_in_for_filter_is_ok():
+    """Calling a <decides> function in a for-filter is valid (guarded)."""
+    check_src(
+        "IsEven(N : int)<decides> : int =\n"
+        "    if (N % 2 = 0):\n"
+        "        return N\n"
+        "    else:\n"
+        "        return false\n"
+        "Main() : void =\n"
+        "    for (N : 1..5, IsEven(N)):\n"
+        "        Print(ToString(N))\n"
+    )
+
+
+def test_effect_failable_unwrap_outside_decides_is_error():
+    """Using ? outside a <decides> function is a compile error."""
+    with pytest.raises(VerseCompileError, match="failable unwrap"):
+        check_src(
+            "Main() : void =\n"
+            "    V := option(42)\n"
+            "    X := V?\n"
+        )
+
+
+def test_effect_failable_unwrap_inside_decides_is_ok():
+    """Using ? inside a <decides> function is valid."""
+    check_src(
+        "Unwrap(V : ?int)<decides> : int =\n"
+        "    return V?\n"
+    )
+
+
+def test_effect_failable_unwrap_in_if_clause_is_ok():
+    """Using ? inside an if clause is valid (guarded)."""
+    check_src(
+        "TryUnwrap(V : ?int) : void =\n"
+        "    if (X := V?):\n"
+        "        Print(ToString(X))\n"
+    )
+
+
+def test_effect_nested_decides_function_propagates():
+    """A nested <decides> function can be called unguarded from an outer <decides> function."""
+    check_src(
+        "Outer()<decides> : int =\n"
+        "    Inner()<decides> : int =\n"
+        "        return 1\n"
+        "    return Inner()\n"
+    )
+
+
+def test_effect_nested_decides_call_without_decides_is_error():
+    """A nested <decides> function called without <decides> context is an error."""
+    with pytest.raises(VerseCompileError, match="<decides>"):
+        check_src(
+            "Outer() : int =\n"
+            "    Inner()<decides> : int =\n"
+            "        return 1\n"
+            "    return Inner()\n"
+        )

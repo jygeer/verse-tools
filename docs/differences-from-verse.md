@@ -9,7 +9,7 @@ something isn't mentioned below or in
 [`language-reference.md`](language-reference.md), assume it's not
 supported.
 
-## Static type checking is opt-in; there's still no effect checker
+## Static type checking is opt-in; effect checking is now implemented for `decides`
 
 Real Verse is statically typed with a real effect system (`decides`,
 `transacts`, `varies`, `suspends`, ...) checked at compile time - you
@@ -22,12 +22,19 @@ type mistakes - arithmetic on incompatible types, wrong argument types,
 bad assignments into annotated variables, mismatched return types, and
 class field/constructor mismatches - before the VM runs.
 
-What it still does **not** have is a real effect checker, generic type
-system, or full always-on static typing. Effect specifiers are still only
-parsed/documented metadata, every function may still fail at runtime
-whether or not it declares `<decides>`, and plain `verse run <file>`
-keeps the old dynamic-only behavior for backward compatibility while this
-first cut is still opt-in.
+The type checker now also enforces the **`decides` effect** statically:
+calling a `<decides>` function outside a guarded `if`/`for` clause, or
+using `Expr?` failable-unwrap, from a function that does not itself
+declare `<decides>` is a compile error under strict mode.  Effect
+inference is bottom-up: when a nested function is declared `<decides>`,
+its callers must either guard the call in an `if`/`for` clause or
+themselves declare `<decides>`.
+
+What it still does **not** have is a full effect checker for
+`transacts`, `varies`, and `suspends` (those specifiers are still parsed
+but not validated), generic types, or always-on static typing. Plain
+`verse run <file>` keeps the old dynamic-only behavior for backward
+compatibility while this first cut is still opt-in.
 
 ## Failure propagates in fewer places
 
