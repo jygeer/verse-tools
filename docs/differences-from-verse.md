@@ -36,38 +36,15 @@ but not validated), generic types, or always-on static typing. Plain
 `verse run <file>` keeps the old dynamic-only behavior for backward
 compatibility while this first cut is still opt-in.
 
-## Failure propagates in fewer places
+## Failure still isn't full backtracking semantics
 
-Real Verse: *any* failing sub-expression, anywhere inside a `decides`
-context, immediately fails the whole enclosing context - including a
-bare statement in the middle of a function body.
+Verse-core now treats bare expression-statements as failure checks too:
+if an expression statement evaluates to `false` or an absent option, it
+raises `VerseFailure` just like `if`/`for` clauses and `Expr?`.
 
-Verse-core: failure (`VerseFailure`, see
-[`architecture.md`](architecture.md#2-failure-is-a-real-exception-with-an-explicit-handler-stack))
-only automatically propagates from:
-
-- an `if`/`for` **clause** (`if (X := F()):`, `for (X : Xs, Filter):`),
-- the `?` unwrap operator (`Expr?`),
-- an uncaught failure inside a called function (propagates to the call).
-
-A bare boolean expression statement that evaluates to `false`, sitting
-by itself in the middle of a function body, does **nothing** in
-Verse-core - it's just evaluated and discarded. To signal failure from
-partway through a function, `return false` explicitly:
-
-```verse
-# Does NOT fail the function in Verse-core (would in real Verse):
-F()<decides>: void =
-    B <> 0        # <- no effect here, just evaluated and dropped
-    ...
-
-# Correct in Verse-core:
-F()<decides>: void =
-    if (B <> 0):
-        ...
-    else:
-        return false
-```
+What's still missing versus real Verse is the deeper
+logic-programming/effect-runtime behavior: no backtracking, no multiple
+solutions, and no retries across alternative bindings.
 
 ## No backtracking, no multiple solutions
 

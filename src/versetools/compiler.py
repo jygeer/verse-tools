@@ -146,7 +146,7 @@ class Compiler:
     def _compile_stmt(self, stmt: A.Stmt, ctx: _FuncCtx):
         if isinstance(stmt, A.ExprStmt):
             self._compile_expr(stmt.expr, ctx)
-            ctx.emit(Op.POP, line=stmt.line)
+            ctx.emit(Op.POP_CHECKED, line=stmt.line)
         elif isinstance(stmt, A.VarDecl):
             self._compile_var_decl(stmt, ctx)
         elif isinstance(stmt, A.Assign):

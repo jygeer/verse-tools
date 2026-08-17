@@ -43,6 +43,8 @@ CI (`.github/workflows/ci.yml`) runs `pytest` across Python 3.10-3.13 and
 verifies the package builds (`python -m build`) on every push/PR to `main`.
 Treat a local `pytest` failure or an unbuildable package as a hard blocker,
 never something to route around.
+Any behavior change must include or update a regression test under `tests/`
+so the CI `pytest` matrix enforces it going forward.
 
 **Any feature or bug-fix change in `src/versetools/` must follow the
 `feature-dev` skill workflow** (`.claude/skills/feature-dev/SKILL.md`):
