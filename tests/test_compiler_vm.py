@@ -119,6 +119,57 @@ def test_decides_function_and_if_binding(runner):
     assert runner.output == "5.0\nfail"
 
 
+def test_decides_expr_statement_false_propagates_failure(runner):
+    runner.run(
+        "FailMid()<decides> : int =\n"
+        "    false\n"
+        "    return 1\n"
+        "if (V := FailMid()):\n"
+        "    Print(ToString(V))\n"
+        "else:\n"
+        "    Print(\"failed\")\n"
+    )
+    assert runner.output == "failed"
+
+
+def test_decides_expr_statement_absent_option_propagates_failure(runner):
+    runner.run(
+        "FailOnMissing()<decides> : int =\n"
+        "    M := map{\"ok\" => 1}\n"
+        "    M[\"missing\"]\n"
+        "    return 1\n"
+        "if (V := FailOnMissing()):\n"
+        "    Print(ToString(V))\n"
+        "else:\n"
+        "    Print(\"failed\")\n"
+    )
+    assert runner.output == "failed"
+
+
+def test_non_decides_expr_statement_false_does_not_fail(runner):
+    runner.run(
+        "Main() : void =\n"
+        "    false\n"
+        "    Print(\"ok\")\n"
+        "Main()\n"
+    )
+    assert runner.output == "ok"
+
+
+def test_decides_expr_statement_success_values_continue(runner):
+    runner.run(
+        "PassMid()<decides> : int =\n"
+        "    option(123)\n"
+        "    true\n"
+        "    return 42\n"
+        "if (V := PassMid()):\n"
+        "    Print(ToString(V))\n"
+        "else:\n"
+        "    Print(\"failed\")\n"
+    )
+    assert runner.output == "42"
+
+
 def test_failable_unwrap_propagates(runner):
     with pytest.raises(VerseFailure):
         runner.run("Opt := option(1)\nX := false?\n")

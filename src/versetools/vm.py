@@ -200,6 +200,11 @@ class VM:
                 elif op == Op.POP:
                     stack.pop()
                     frame.pc += 1
+                elif op == Op.POP_CHECKED:
+                    ok, _bound = _clause_result(stack.pop())
+                    if not ok:
+                        raise VerseFailure()
+                    frame.pc += 1
                 elif op == Op.BINARY_OP:
                     b = stack.pop()
                     a = stack.pop()

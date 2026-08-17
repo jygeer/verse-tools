@@ -44,10 +44,11 @@ class _FuncCtx:
     """Per-function compilation state: the chunk being built plus the
     stack of enclosing loops (for break/continue jump patching)."""
 
-    def __init__(self, chunk: Chunk):
+    def __init__(self, chunk: Chunk, *, decides_context: bool = False):
         self.chunk = chunk
         self.loop_stack: list[dict] = []
         self.scope_depth = 0
+        self.decides_context = decides_context
 
     def emit(self, op: Op, arg=None, line: int = 0) -> int:
         return self.chunk.emit(op, arg, line)
@@ -77,7 +78,7 @@ class Compiler:
 
     def compile_program(self, program: A.Program) -> Chunk:
         chunk = Chunk(name="<script>")
-        ctx = _FuncCtx(chunk)
+        ctx = _FuncCtx(chunk, decides_context=False)
         for stmt in program.body:
             self._compile_stmt(stmt, ctx)
         ctx.emit(Op.LOAD_CONST, ctx.add_const(VOID))
@@ -91,7 +92,7 @@ class Compiler:
         self, name: str, params: list[A.Param], effects: list[str], body: A.Block
     ) -> FunctionProto:
         chunk = Chunk(name=name)
-        ctx = _FuncCtx(chunk)
+        ctx = _FuncCtx(chunk, decides_context=("decides" in effects))
         self._compile_function_body(body, ctx)
         param_specs = [
             ParamSpec(
@@ -146,7 +147,7 @@ class Compiler:
     def _compile_stmt(self, stmt: A.Stmt, ctx: _FuncCtx):
         if isinstance(stmt, A.ExprStmt):
             self._compile_expr(stmt.expr, ctx)
-            ctx.emit(Op.POP, line=stmt.line)
+            ctx.emit(Op.POP_CHECKED if ctx.decides_context else Op.POP, line=stmt.line)
         elif isinstance(stmt, A.VarDecl):
             self._compile_var_decl(stmt, ctx)
         elif isinstance(stmt, A.Assign):

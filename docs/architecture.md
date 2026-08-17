@@ -181,7 +181,7 @@ member has a one-line comment); the categories are:
 | Category | Opcodes |
 |---|---|
 | Constants / names | `LOAD_CONST`, `LOAD_NAME`, `STORE_NAME`, `SET_NAME`, `PUSH_SCOPE`, `POP_SCOPE` |
-| Stack shuffling | `POP` |
+| Stack shuffling | `POP`, `POP_CHECKED` |
 | Arithmetic / logic | `BINARY_OP`, `UNARY_OP` |
 | Control flow | `JUMP`, `JUMP_IF_FALSE`, `JUMP_IF_TRUE` |
 | Failure handling | `PUSH_HANDLER`, `POP_HANDLER`, `CLAUSE_CHECK`, `FAILABLE_UNWRAP` |
