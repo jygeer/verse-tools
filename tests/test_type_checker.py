@@ -46,6 +46,21 @@ def test_type_checker_allows_nested_function_definitions():
     )
 
 
+def test_type_checker_allows_omitted_default_arguments():
+    check_src(
+        'Greet(Name : string, Greeting : string = "Hello") : string =\n'
+        '    return Greeting + ", " + Name\n'
+        'Print(Greet("Ada"))\n'
+    )
+
+
+def test_type_checker_allows_dependent_if_clause_bindings():
+    check_src(
+        "if (X := option(1), X = 1):\n"
+        '    Print("ok")\n'
+    )
+
+
 def test_type_checker_rejects_return_type_mismatch():
     with pytest.raises(VerseCompileError, match="cannot return string from int function"):
         check_src('Describe() : int =\n    return "x"\n')

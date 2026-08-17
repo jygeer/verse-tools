@@ -74,6 +74,7 @@ class ClassType(Type):
 class FunctionType(Type):
     param_types: tuple[Type, ...]
     return_type: Type
+    required_params: int | None = None
 
 
 @dataclass(frozen=True)

@@ -174,10 +174,11 @@ Good(X : int) : int =
         return 2
 ```
 
-**Effect specifiers** (`<decides>`, `<transacts>`, ...) are still parsed
-and attached to the function for documentation/introspection, but are not
-statically enforced yet - any function may fail, whether or not it
-declares `<decides>`. See [Failure and options](#failure-and-options).
+**Effect specifiers** (`<decides>`, `<transacts>`, ...) are parsed and
+attached to the function. The opt-in checker enforces `<decides>` calls and
+failable unwraps, while `<transacts>`, `<varies>`, and `<suspends>` are not
+validated yet. Dynamic execution still permits failure regardless of the
+declared effects. See [Failure and options](#failure-and-options).
 
 ## Control flow
 

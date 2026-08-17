@@ -367,16 +367,16 @@ class VM:
                 raise VerseRuntimeError(f"'{spec.base}' is not a class", line)
         methods = {m.name: VFunction(m, env) for m in spec.methods}
         field_specs = [(f.name, f.default_chunk) for f in spec.fields]
-        return VClass(spec.name, base, field_specs, methods)
+        return VClass(spec.name, base, field_specs, methods, env)
 
     def _build_instance(self, env: Environment, type_name_: str, field_names, values, line: int):
         cls = env.get(type_name_)
         if not isinstance(cls, VClass):
             raise VerseRuntimeError(f"'{type_name_}' is not a class", line)
         fields = {}
-        for name, default_chunk in cls.all_field_specs():
+        for name, default_chunk, closure_env in cls.all_field_specs():
             fields[name] = self._drain(
-                self._exec_frame(Frame(default_chunk, Environment(parent=self.globals)))
+                self._exec_frame(Frame(default_chunk, Environment(parent=closure_env)))
             )
         for name, value in zip(field_names, values):
             if name not in fields:

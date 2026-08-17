@@ -106,7 +106,15 @@ class TypeChecker:
     def _function_type(self, params: list[A.Param], return_type: str | None, line: int) -> Type:
         param_types = tuple(self._type_from_ann(p.type_ann, p.line) for p in params)
         ret_type = self._type_from_ann(return_type, line) if return_type is not None else UNKNOWN
-        return FunctionType(param_types=param_types, return_type=ret_type)
+        required_params = max(
+            (index + 1 for index, param in enumerate(params) if param.default is None),
+            default=0,
+        )
+        return FunctionType(
+            param_types=param_types,
+            return_type=ret_type,
+            required_params=required_params,
+        )
 
     def _declared_or_inferred_type(self, type_ann: str | None, value: A.Expr | None, line: int) -> Type:
         if type_ann is not None:
@@ -325,10 +333,16 @@ class TypeChecker:
 
     def _collect_clause_bindings(self, clauses: list[A.IfClause]) -> dict[str, Type]:
         bindings = {}
-        for clause in clauses:
-            expr_type = self._infer_expr_type(clause.expr)
-            if clause.name is not None:
-                bindings[clause.name] = self._clause_binding_type(expr_type)
+        self._push_scope()
+        try:
+            for clause in clauses:
+                expr_type = self._infer_expr_type(clause.expr)
+                if clause.name is not None:
+                    binding_type = self._clause_binding_type(expr_type)
+                    bindings[clause.name] = binding_type
+                    self._define(clause.name, binding_type)
+        finally:
+            self._pop_scope()
         return bindings
 
     def _clause_binding_type(self, expr_type: Type) -> Type:
@@ -556,9 +570,14 @@ class TypeChecker:
         if isinstance(callee_type, BuiltinType):
             return self._infer_builtin_call(expr, callee_type.name)
         if isinstance(callee_type, FunctionType):
-            if len(expr.args) != len(callee_type.param_types):
+            required_params = (
+                len(callee_type.param_types)
+                if callee_type.required_params is None
+                else callee_type.required_params
+            )
+            if not required_params <= len(expr.args) <= len(callee_type.param_types):
                 raise VerseCompileError(
-                    f"function expects {len(callee_type.param_types)} argument(s), got {len(expr.args)}",
+                    f"function expects between {required_params} and {len(callee_type.param_types)} argument(s), got {len(expr.args)}",
                     expr.line,
                 )
             for i, (arg, param_type) in enumerate(zip(expr.args, callee_type.param_types), start=1):

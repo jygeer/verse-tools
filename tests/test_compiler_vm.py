@@ -197,6 +197,19 @@ def test_class_fields_methods_inheritance(runner):
     assert runner.output == "12.0\ns"
 
 
+def test_nested_class_field_default_captures_declaring_scope(runner):
+    runner.run(
+        'Make() : void =\n'
+        '    Prefix := "local"\n'
+        '    thing := class:\n'
+        '        Name : string = Prefix\n'
+        '    Value := thing{}\n'
+        '    Print(Value.Name)\n'
+        'Make()\n'
+    )
+    assert runner.output == "local"
+
+
 def test_closure_capture_and_call(runner):
     runner.run(
         "Add5 := 0\n"

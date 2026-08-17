@@ -147,15 +147,16 @@ class VRange:
 
 
 class VClass:
-    def __init__(self, name: str, base: "VClass | None", field_specs, methods: dict):
+    def __init__(self, name: str, base: "VClass | None", field_specs, methods: dict, closure_env):
         self.name = name
         self.base = base
         self.field_specs = field_specs  # list[(name, default_chunk_or_None)]
         self.methods = methods  # name -> VFunction
+        self.closure_env = closure_env
 
     def all_field_specs(self):
         specs = [] if self.base is None else self.base.all_field_specs()
-        return specs + self.field_specs
+        return specs + [(*field_spec, self.closure_env) for field_spec in self.field_specs]
 
     def find_method(self, name: str):
         if name in self.methods:
