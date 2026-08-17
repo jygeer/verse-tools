@@ -36,15 +36,12 @@ but not validated), generic types, or always-on static typing. Plain
 `verse run <file>` keeps the old dynamic-only behavior for backward
 compatibility while this first cut is still opt-in.
 
-## Failure still isn't full backtracking semantics
+## Statement-level failure checks in `<decides>` functions
 
-Verse-core now treats bare expression-statements as failure checks too:
-if an expression statement evaluates to `false` or an absent option, it
-raises `VerseFailure` just like `if`/`for` clauses and `Expr?`.
-
-What's still missing versus real Verse is the deeper
-logic-programming/effect-runtime behavior: no backtracking, no multiple
-solutions, and no retries across alternative bindings.
+Verse-core now treats bare expression-statements inside `<decides>`
+functions as failure checks too: if an expression statement evaluates to
+`false` or an absent option, it raises `VerseFailure` just like
+`if`/`for` clauses and `Expr?`.
 
 ## No backtracking, no multiple solutions
 

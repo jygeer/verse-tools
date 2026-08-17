@@ -27,7 +27,7 @@ class Op(Enum):
     POP_SCOPE = auto()    # discard the current child environment
 
     POP = auto()
-    POP_CHECKED = auto()    # pops value; raises VerseFailure on false/absent option
+    POP_CHECKED = auto()    # pops and discards value; raises VerseFailure on false/absent option
 
     BINARY_OP = auto()    # arg: str operator
     UNARY_OP = auto()      # arg: str operator

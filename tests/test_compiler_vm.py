@@ -146,6 +146,30 @@ def test_decides_expr_statement_absent_option_propagates_failure(runner):
     assert runner.output == "failed"
 
 
+def test_non_decides_expr_statement_false_does_not_fail(runner):
+    runner.run(
+        "Main() : void =\n"
+        "    false\n"
+        "    Print(\"ok\")\n"
+        "Main()\n"
+    )
+    assert runner.output == "ok"
+
+
+def test_decides_expr_statement_success_values_continue(runner):
+    runner.run(
+        "PassMid()<decides> : int =\n"
+        "    option(123)\n"
+        "    true\n"
+        "    return 42\n"
+        "if (V := PassMid()):\n"
+        "    Print(ToString(V))\n"
+        "else:\n"
+        "    Print(\"failed\")\n"
+    )
+    assert runner.output == "42"
+
+
 def test_failable_unwrap_propagates(runner):
     with pytest.raises(VerseFailure):
         runner.run("Opt := option(1)\nX := false?\n")
