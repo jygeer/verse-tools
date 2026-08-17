@@ -87,6 +87,50 @@ def test_array_index_out_of_range_raises(runner):
         runner.run("A := array{1}\nX := A[5]\n")
 
 
+def test_array_value_semantics_copy_on_assign(runner):
+    runner.run(
+        "var A : []int = array{1, 2, 3}\n"
+        "var B : []int = A\n"
+        "set B[0] = 99\n"
+        "Print(ToString(A[0]))\n"
+        "Print(ToString(B[0]))\n"
+    )
+    assert runner.output == "1\n99"
+
+
+def test_array_set_index_updates_variable(runner):
+    runner.run(
+        "var Arr : []int = array{10, 20, 30}\n"
+        "set Arr[1] = 99\n"
+        "Print(ToString(Arr[1]))\n"
+    )
+    assert runner.output == "99"
+
+
+def test_map_value_semantics_copy_on_assign(runner):
+    runner.run(
+        'var M : [string]int = map{"a" => 1}\n'
+        'var N : [string]int = M\n'
+        'set N["a"] = 42\n'
+        'if (V := M["a"]):\n'
+        '    Print(ToString(V))\n'
+        'if (V := N["a"]):\n'
+        '    Print(ToString(V))\n'
+    )
+    assert runner.output == "1\n42"
+
+
+def test_array_set_index_on_class_field(runner):
+    runner.run(
+        "Container := class:\n"
+        "    Data : []int = array{10, 20, 30}\n"
+        "C := Container{Data := array{10, 20, 30}}\n"
+        "set C.Data[1] = 55\n"
+        "Print(ToString(C.Data[1]))\n"
+    )
+    assert runner.output == "55"
+
+
 def test_map_get_returns_option(runner):
     runner.run(
         'M := map{"a" => 1}\n'

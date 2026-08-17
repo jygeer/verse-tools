@@ -71,16 +71,6 @@ compiler to recursively rewrite every block's exit points, which
 interacts non-trivially with the failure-handler jump targets described
 in the architecture doc; out of scope for this subset.)
 
-## Arrays and maps are shared mutable references, not value types
-
-Real Verse arrays/maps have copy-on-write value semantics: assigning one
-`var` array to another conceptually copies it, and later mutating one
-doesn't affect the other. Verse-core's `VArray`/`VMap` are ordinary
-mutable Python-object references - assigning `set B = A` aliases the
-same underlying array, and `set B[0] = X` will be visible through `A`
-too. If you need an independent copy, rebuild it explicitly (e.g.
-`B := A + array{}`).
-
 ## Classes are simpler
 
 - Single inheritance only - `class(Base)`, no multiple base
