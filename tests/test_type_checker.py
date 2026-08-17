@@ -155,3 +155,55 @@ def test_effect_nested_decides_call_without_decides_is_error():
             "        return 1\n"
             "    return Inner()\n"
         )
+
+
+def test_effect_decides_call_in_if_expr_is_ok():
+    """Calling a <decides> function inside an inline if-expression clause is valid (guarded)."""
+    check_src(
+        "MayFail()<decides> : int =\n"
+        "    return 1\n"
+        "Main() : void =\n"
+        "    V := if (X := MayFail()) then X else 0\n"
+    )
+
+
+def test_effect_failable_unwrap_in_for_filter_is_ok():
+    """Using ? inside a for-filter clause is valid (guarded)."""
+    check_src(
+        "Main() : void =\n"
+        "    Items := array{option(1), option(2), option(3)}\n"
+        "    for (V : Items, V?):\n"
+        "        Print(\"ok\")\n"
+    )
+
+
+def test_effect_multiple_decides_calls_in_same_if_clause_is_ok():
+    """Multiple <decides> calls inside the same if clause are all valid (guarded)."""
+    check_src(
+        "A()<decides> : int =\n"
+        "    return 1\n"
+        "B()<decides> : int =\n"
+        "    return 2\n"
+        "Main() : void =\n"
+        "    if (X := A(), Y := B()):\n"
+        "        Print(ToString(X + Y))\n"
+    )
+
+
+def test_effect_decides_function_calling_plain_function_is_ok():
+    """A <decides> function can freely call ordinary (non-<decides>) functions."""
+    check_src(
+        "Helper() : int =\n"
+        "    return 42\n"
+        "Wrapper()<decides> : int =\n"
+        "    return Helper()\n"
+    )
+
+
+def test_effect_failable_unwrap_outside_function_is_error():
+    """Using ? at top-level (outside any function) is a compile error."""
+    with pytest.raises(VerseCompileError, match="failable unwrap"):
+        check_src(
+            "V := option(1)\n"
+            "X := V?\n"
+        )
