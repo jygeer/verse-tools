@@ -202,8 +202,10 @@ class TypeChecker:
 
     def _check_if(self, stmt: A.If):
         self._guarded_clause_depth += 1
-        bindings = self._collect_clause_bindings(stmt.clauses)
-        self._guarded_clause_depth -= 1
+        try:
+            bindings = self._collect_clause_bindings(stmt.clauses)
+        finally:
+            self._guarded_clause_depth -= 1
         self._push_scope()
         for name, typ in bindings.items():
             self._define(name, typ)
@@ -222,9 +224,11 @@ class TypeChecker:
         self._push_scope()
         self._define(stmt.var_name, item_type)
         self._guarded_clause_depth += 1
-        for filt in stmt.filters:
-            self._infer_expr_type(filt)
-        self._guarded_clause_depth -= 1
+        try:
+            for filt in stmt.filters:
+                self._infer_expr_type(filt)
+        finally:
+            self._guarded_clause_depth -= 1
         for inner in stmt.body.statements:
             self._check_stmt(inner)
         self._pop_scope()
@@ -259,6 +263,12 @@ class TypeChecker:
                         f"cannot assign {format_type(default_type)} to parameter {param.name} : {format_type(param_type)}",
                         param.line,
                     )
+        # Pre-scan: register effects of all directly nested FuncDecl statements
+        # before type-checking the body, so that forward-referenced <decides>
+        # functions are visible when their callers are checked.
+        for stmt in node.body.statements:
+            if isinstance(stmt, A.FuncDecl):
+                self._func_effects[stmt.name] = frozenset(stmt.effects)
         for stmt in node.body.statements:
             self._check_stmt(stmt)
         self._check_implicit_return(node)
@@ -683,8 +693,10 @@ class TypeChecker:
 
     def _infer_if_expr_type(self, expr: A.IfExpr) -> Type:
         self._guarded_clause_depth += 1
-        bindings = self._collect_clause_bindings(expr.clauses)
-        self._guarded_clause_depth -= 1
+        try:
+            bindings = self._collect_clause_bindings(expr.clauses)
+        finally:
+            self._guarded_clause_depth -= 1
         self._push_scope()
         for name, typ in bindings.items():
             self._define(name, typ)
