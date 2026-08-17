@@ -250,7 +250,8 @@ class VM:
                     value = stack.pop()
                     index = stack.pop()
                     obj = stack.pop()
-                    _set_index(obj, index, value, instr.line)
+                    new_obj = _set_index(obj, index, value, instr.line)
+                    stack.append(new_obj)
                     frame.pc += 1
                 elif op == Op.GET_MEMBER:
                     obj = stack.pop()
@@ -491,11 +492,9 @@ def _get_index(obj, index, line: int):
 
 def _set_index(obj, index, value, line: int):
     if isinstance(obj, VArray):
-        obj.set(index, value)
-        return
+        return obj.set(index, value)
     if isinstance(obj, VMap):
-        obj.set(index, value)
-        return
+        return obj.set(index, value)
     raise VerseRuntimeError(f"type {type_name(obj)} does not support index assignment", line)
 
 

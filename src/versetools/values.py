@@ -87,12 +87,14 @@ class VArray:
             raise VerseRuntimeError(f"array index {index} out of range (length {len(self.items)})")
         return self.items[index]
 
-    def set(self, index: int, value):
+    def set(self, index: int, value) -> "VArray":
         if not isinstance(index, int) or isinstance(index, bool):
             raise VerseRuntimeError(f"array index must be an int, got {type_name(index)}")
         if index < 0 or index >= len(self.items):
             raise VerseRuntimeError(f"array index {index} out of range (length {len(self.items)})")
-        self.items[index] = value
+        new_items = list(self.items)
+        new_items[index] = value
+        return VArray(new_items)
 
     def __eq__(self, other):
         return isinstance(other, VArray) and self.items == other.items
@@ -115,8 +117,10 @@ class VMap:
             return VOption.some(self.pairs[key])
         return VOption.none()
 
-    def set(self, key, value):
-        self.pairs[key] = value
+    def set(self, key, value) -> "VMap":
+        new_pairs = dict(self.pairs)
+        new_pairs[key] = value
+        return VMap(new_pairs)
 
     def __len__(self):
         return len(self.pairs)

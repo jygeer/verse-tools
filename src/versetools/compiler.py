@@ -204,10 +204,26 @@ class Compiler:
             self._compile_expr(stmt.value, ctx)
             ctx.emit(Op.SET_MEMBER, target.name, stmt.line)
         elif isinstance(target, A.Index):
-            self._compile_expr(target.obj, ctx)
-            self._compile_expr(target.index, ctx)
-            self._compile_expr(stmt.value, ctx)
-            ctx.emit(Op.SET_INDEX, None, stmt.line)
+            inner = target.obj
+            if isinstance(inner, A.Identifier):
+                self._compile_expr(inner, ctx)
+                self._compile_expr(target.index, ctx)
+                self._compile_expr(stmt.value, ctx)
+                ctx.emit(Op.SET_INDEX, None, stmt.line)
+                ctx.emit(Op.SET_NAME, inner.name, stmt.line)
+            elif isinstance(inner, A.Member):
+                # Load the container object first (for the eventual SET_MEMBER
+                # write-back), then load the field value (array/map) again.
+                self._compile_expr(inner.obj, ctx)
+                self._compile_expr(inner, ctx)
+                self._compile_expr(target.index, ctx)
+                self._compile_expr(stmt.value, ctx)
+                ctx.emit(Op.SET_INDEX, None, stmt.line)
+                ctx.emit(Op.SET_MEMBER, inner.name, stmt.line)
+            else:
+                raise VerseCompileError(
+                    "index assignment target must be a variable or field", stmt.line
+                )
         else:
             raise VerseCompileError("invalid assignment target", stmt.line)
 
