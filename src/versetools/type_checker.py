@@ -47,6 +47,13 @@ class TypeChecker:
         self.classes: dict[str, ClassInfo] = {}
         self.current_return_type: Type = UNKNOWN
         self.current_allows_failure = False
+        # Maps function name -> frozenset of declared effect strings, populated bottom-up
+        # so that callers can check whether a callee is <decides> etc.
+        self._func_effects: dict[str, frozenset[str]] = {}
+        # Depth counter: > 0 when we are type-checking expressions inside an if/for
+        # clause list or for-filter list.  Calls to <decides> functions are allowed
+        # (and guarded) there even in a non-decides caller.
+        self._guarded_clause_depth: int = 0
         self._install_builtins()
 
     def check_program(self, program: A.Program) -> None:
@@ -84,6 +91,7 @@ class TypeChecker:
         for stmt in program.body:
             if isinstance(stmt, A.FuncDecl):
                 self.scopes[0][stmt.name] = self._function_type(stmt.params, stmt.return_type, stmt.line)
+                self._func_effects[stmt.name] = frozenset(stmt.effects)
 
     def _populate_class_info(self, node: A.ClassDecl):
         info = self.classes[node.name]
@@ -157,6 +165,7 @@ class TypeChecker:
             return
         if isinstance(stmt, A.FuncDecl):
             self._define(stmt.name, self._function_type(stmt.params, stmt.return_type, stmt.line))
+            self._func_effects[stmt.name] = frozenset(stmt.effects)
             self._check_function(stmt)
             return
         if isinstance(stmt, A.ClassDecl):
@@ -192,7 +201,11 @@ class TypeChecker:
             )
 
     def _check_if(self, stmt: A.If):
-        bindings = self._collect_clause_bindings(stmt.clauses)
+        self._guarded_clause_depth += 1
+        try:
+            bindings = self._collect_clause_bindings(stmt.clauses)
+        finally:
+            self._guarded_clause_depth -= 1
         self._push_scope()
         for name, typ in bindings.items():
             self._define(name, typ)
@@ -210,8 +223,12 @@ class TypeChecker:
         item_type = self._iterable_item_type(iterable_type, stmt.line)
         self._push_scope()
         self._define(stmt.var_name, item_type)
-        for filt in stmt.filters:
-            self._infer_expr_type(filt)
+        self._guarded_clause_depth += 1
+        try:
+            for filt in stmt.filters:
+                self._infer_expr_type(filt)
+        finally:
+            self._guarded_clause_depth -= 1
         for inner in stmt.body.statements:
             self._check_stmt(inner)
         self._pop_scope()
@@ -246,6 +263,12 @@ class TypeChecker:
                         f"cannot assign {format_type(default_type)} to parameter {param.name} : {format_type(param_type)}",
                         param.line,
                     )
+        # Pre-scan: register effects of all directly nested FuncDecl statements
+        # before type-checking the body, so that forward-referenced <decides>
+        # functions are visible when their callers are checked.
+        for stmt in node.body.statements:
+            if isinstance(stmt, A.FuncDecl):
+                self._func_effects[stmt.name] = frozenset(stmt.effects)
         for stmt in node.body.statements:
             self._check_stmt(stmt)
         self._check_implicit_return(node)
@@ -385,6 +408,11 @@ class TypeChecker:
             return self._member_type(self._infer_expr_type(expr.obj), expr.name, expr.line)
         if isinstance(expr, A.FailableUnwrap):
             operand = self._infer_expr_type(expr.operand)
+            if self._guarded_clause_depth == 0 and not self.current_allows_failure:
+                raise VerseCompileError(
+                    "failable unwrap '?' used outside a <decides> function or guarded if clause",
+                    expr.line,
+                )
             return operand.value_type if isinstance(operand, OptionType) else operand
         if isinstance(expr, A.ArrayLiteral):
             if not expr.elements:
@@ -513,6 +541,17 @@ class TypeChecker:
         raise VerseCompileError(f"unknown operator '{expr.op}'", expr.line)
 
     def _infer_call_type(self, expr: A.Call) -> Type:
+        # Effect check: if the callee is a named <decides> function, calling it
+        # outside a guarded if/for clause requires the current function to also
+        # be <decides> (the failure propagates to the caller).
+        if isinstance(expr.callee, A.Identifier):
+            callee_effects = self._func_effects.get(expr.callee.name, frozenset())
+            if "decides" in callee_effects and self._guarded_clause_depth == 0 and not self.current_allows_failure:
+                raise VerseCompileError(
+                    f"'{expr.callee.name}' is <decides> and must be called inside an if clause"
+                    " or from a <decides> function",
+                    expr.line,
+                )
         callee_type = self._infer_expr_type(expr.callee)
         if isinstance(callee_type, BuiltinType):
             return self._infer_builtin_call(expr, callee_type.name)
@@ -653,7 +692,11 @@ class TypeChecker:
         return ClassType(expr.type_name)
 
     def _infer_if_expr_type(self, expr: A.IfExpr) -> Type:
-        bindings = self._collect_clause_bindings(expr.clauses)
+        self._guarded_clause_depth += 1
+        try:
+            bindings = self._collect_clause_bindings(expr.clauses)
+        finally:
+            self._guarded_clause_depth -= 1
         self._push_scope()
         for name, typ in bindings.items():
             self._define(name, typ)
