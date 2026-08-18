@@ -66,6 +66,28 @@ Sizes assume one experienced contributor working from this repo's
 existing architecture (`docs/architecture.md`); they're for sequencing
 conversations, not commitments.
 
+## Additional reference baseline: `augustss/verse-semantics`
+
+Alongside Epic's public docs, this roadmap now also treats
+[`augustss/verse-semantics`](https://github.com/augustss/verse-semantics)
+as the closest public, standalone reference implementation to compare
+against when scoping Verse-core parity work. Concretely, that repo
+already ships:
+
+- a REPL and batch tester (`README.md`, `tests/tests.versetest`);
+- a broader "Essential Verse" surface language in `FrontEnd/Expr.hs`,
+  including anonymous functions, tuples/patterns, choice/search forms,
+  and `verify`-related syntax; and
+- a solver-backed verification track (`tests/verify.versetest`,
+  `Core/Solver.hs`) for guard/domain reasoning that this project does
+  not currently attempt.
+
+That does **not** change the non-goals above: parity here means
+"match the standalone language/runtime/tooling ideas that fit
+Verse-core," not "inherit private Epic behavior" and not "grow UEFN or
+Fortnite integration." The roadmap items below call out the biggest
+gaps surfaced by that comparison.
+
 ## Phase 1 - Language fidelity
 
 Goal of this phase: close the *semantic* gaps in
@@ -277,6 +299,56 @@ remaining work.
 - **Effort:** M.
 - **Depends on:** none.
 
+### 1.10 Anonymous functions and closure syntax
+
+- **Goal:** reach parity with the reference implementation's first-class
+  function surface area (`x:int => x + 1`, nested currying, and
+  function-valued expressions in `tests/tests.versetest`), instead of
+  requiring every callable to be introduced by a statement-level named
+  `FuncDecl`.
+- **Approach:** extend the parser/AST with lambda/function-expression
+  nodes, then lower them through the existing `MAKE_FUNCTION` closure
+  path the compiler/VM already use for nested named functions. Start
+  with expression-level lambdas and capture semantics; only then worry
+  about sugar-equivalence with every function-declaration form the
+  reference repo accepts.
+- **Effort:** M.
+- **Depends on:** none strictly, though 1.2 makes the parameter/return
+  diagnostics much better.
+
+### 1.11 Tuples, destructuring, and splice patterns
+
+- **Goal:** close the large data-model gap visible in the reference
+  tests: tuple values, tuple parameter/pattern destructuring, and
+  eventually `..rest`/splice forms used in both tuple patterns and call
+  sites (`tests/tests.versetest`'s `Splice*`, `Pat*`, and higher-order
+  cases).
+- **Approach:** add tuple expressions/patterns as first-class AST nodes
+  distinct from arrays, then thread them through the type checker,
+  compiler, and VM as immutable fixed-arity product values. Sequence
+  the work in layers: fixed-arity tuple literals/index-free
+  destructuring first, variadic/splice forms second once the binding
+  rules are nailed down.
+- **Effort:** L.
+- **Depends on:** 1.1 for sane scope boundaries during destructuring;
+  1.2 is strongly preferred before splice-heavy typing rules.
+
+### 1.12 Choice/search surface syntax on top of real backtracking
+
+- **Goal:** match the reference implementation's logic-programming
+  surface constructs - choice (`A | B`), `one{...}`, `all{...}`,
+  `exists`, and related search-oriented idioms - rather than stopping at
+  a hidden backtracking engine with no first-class syntax for it.
+- **Approach:** keep 1.4.2 as the semantic prerequisite, then layer the
+  extra syntax on top of that engine instead of inventing a parallel
+  mechanism. `all{...}` should lower to "enumerate every successful
+  branch and collect the results"; `one{...}` to first-success; choice
+  and existential forms become sugar over the same resumable failure
+  machinery.
+- **Effort:** XL.
+- **Depends on:** 1.4.2; 1.11 if tuple-pattern-heavy search examples are
+  expected to work out of the gate.
+
 ## Phase 2 - Performance-oriented VM redesign
 
 The current VM (`vm.py`) optimizes for *readability and correctness of
@@ -408,8 +480,19 @@ blocks or is blocked by Phase 1-3, so it can be picked up opportunistically.
   practice regardless of what else ships - whenever a real-Verse
   behavior is confirmed from Epic's public docs or sample code, add a
   Verse-core program + expected output to `tests/`, tagged with which
-  differences-doc item it exercises. This is what keeps "closer
-  alignment" honest and measurable over time, rather than aspirational.
+  differences-doc item it exercises. Curate a second stream of imported
+  cases from `augustss/verse-semantics` (`tests/tests.versetest` and, if
+  a verifier track is pursued, `tests/verify.versetest`) so parity with
+  that public reference stays measurable too. This is what keeps
+  "closer alignment" honest and measurable over time, rather than
+  aspirational.
+- **Reference-style verifier harness**: if parity with
+  `verse-semantics`'s `verify(...)` workflow becomes a priority, add it
+  as a distinct command/tooling track (`verse verify` or pytest-backed
+  fixtures), reusing 1.2/1.3's static analysis where possible and only
+  then considering a localized constraint solver inspired by
+  `Core/Solver.hs`. Keep this explicitly optional until the interpreter
+  semantics themselves are closer.
 
 ## Sequencing and effort summary
 
@@ -424,20 +507,25 @@ Rough recommended order, front-loading small/high-value items:
 5. **1.2** static type checking (L) - unlocks 1.3, 1.6's access
    specifiers, and 4's LSP.
 6. **1.3** static effect checking (L, depends on 1.2).
-7. **1.6**, **1.8**, **1.9** class/stdlib/concurrency rounding-out (M
+7. **1.10** anonymous functions (M) and **1.11** tuples/destructuring
+   (L) - the biggest `verse-semantics` surface-language gaps not already
+   tracked above.
+8. **1.6**, **1.8**, **1.9** class/stdlib/concurrency rounding-out (M
    each, mostly independent, pick up opportunistically).
-8. **1.7** modules (L).
-9. **2b** native Rust core (XL) - once 1.1/1.5 have settled the
+9. **1.7** modules (L).
+10. **2b** native Rust core (XL) - once 1.1/1.5 have settled the
    scoping/value-representation questions so they're only designed
    once.
-10. **3.B** wasm32 build of the same Rust core (S-M, rides on 9).
-11. **1.4.2** true backtracking/multiple-solution `decides` (XL) - the
+11. **3.B** wasm32 build of the same Rust core (S-M, rides on 10).
+12. **1.4.2** true backtracking/multiple-solution `decides` (XL) - the
     single hardest, most research-y item on this list; sequence it
     whenever there's appetite for a dedicated design effort, largely
     independent of everything else.
-12. **3.C** direct-to-WASM compiler backend - only if profiling of (10)
+13. **1.12** choice/search syntax (XL) - only after 12 makes the
+    underlying enumeration semantics real.
+14. **3.C** direct-to-WASM compiler backend - only if profiling of (11)
     says it's worth it.
-13. **Phase 4** items - parallelizable throughout, particularly the
+15. **Phase 4** items - parallelizable throughout, particularly the
     conformance corpus, which should really start on day one rather
     than waiting for this list.
 
@@ -481,3 +569,7 @@ If picking just a handful of items to start with:
 5. Write the **1.2 type-checker design doc** - it's the highest-leverage
    Phase 1 item (unlocks 1.3, 1.6, and the LSP) and the one most worth
    getting review on before writing code.
+6. As part of (4), port a **small curated slice of
+   `verse-semantics` tests** first (`tests/tests.versetest`) so future
+   roadmap work on 1.10/1.11/1.12 has executable reference cases from
+   day one.
