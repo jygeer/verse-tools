@@ -222,3 +222,74 @@ def test_effect_failable_unwrap_outside_function_is_error():
             "V := option(1)\n"
             "X := V?\n"
         )
+
+
+def test_type_checker_rejects_private_member_access_outside_declaring_class():
+    with pytest.raises(VerseCompileError, match="private"):
+        check_src(
+            "SecretBox := class:\n"
+            "    Value<private> : int = 1\n"
+            "Read(B : SecretBox) : int =\n"
+            "    return B.Value\n"
+        )
+
+
+def test_type_checker_allows_protected_member_access_in_subclass():
+    check_src(
+        "Base := class:\n"
+        "    Value<protected> : int = 1\n"
+        "Child := class(Base):\n"
+        "    Read() : int =\n"
+        "        return self.Value\n"
+    )
+
+
+def test_type_checker_rejects_protected_member_access_outside_subclass():
+    with pytest.raises(VerseCompileError, match="protected"):
+        check_src(
+            "Base := class:\n"
+            "    Value<protected> : int = 1\n"
+            "Read(B : Base) : int =\n"
+            "    return B.Value\n"
+        )
+
+
+def test_type_checker_rejects_concrete_subclass_missing_abstract_override():
+    with pytest.raises(VerseCompileError, match="abstract method"):
+        check_src(
+            "Shape := class<abstract>:\n"
+            "    Area<abstract>() : int =\n"
+            "Square := class(Shape):\n"
+            "    Side : int = 1\n"
+        )
+
+
+def test_type_checker_allows_concrete_subclass_overriding_abstract_method():
+    check_src(
+        "Shape := class<abstract>:\n"
+        "    Area<abstract>() : int =\n"
+        "Square := class(Shape):\n"
+        "    Side : int = 2\n"
+        "    Area() : int =\n"
+        "        return self.Side * self.Side\n"
+    )
+
+
+def test_type_checker_rejects_missing_interface_method():
+    with pytest.raises(VerseCompileError, match="interface"):
+        check_src(
+            "Renderable := class<abstract>:\n"
+            "    Render<abstract>() : void =\n"
+            "Sprite := class : Renderable:\n"
+            "    Name : string = \"s\"\n"
+        )
+
+
+def test_type_checker_allows_interface_implementation_with_matching_method():
+    check_src(
+        "Renderable := class<abstract>:\n"
+        "    Render<abstract>() : void =\n"
+        "Sprite := class : Renderable:\n"
+        "    Render() : void =\n"
+        "        Print(\"ok\")\n"
+    )

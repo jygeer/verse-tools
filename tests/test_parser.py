@@ -79,6 +79,27 @@ def test_class_decl_with_base_and_method():
     assert child.methods[0].name == "Area"
 
 
+def test_class_decl_with_interfaces_access_and_abstract():
+    src = (
+        "iface := class<abstract>:\n"
+        "    Run<abstract>() : int =\n"
+        "worker := class(iface) : Tickable, Runnable:\n"
+        "    Secret<private> : int = 1\n"
+        "    Run<protected>() : int =\n"
+        "        return self.Secret\n"
+    )
+    prog = parse_src(src)
+    iface = prog.body[0]
+    worker = prog.body[1]
+    assert isinstance(iface, A.ClassDecl)
+    assert iface.is_abstract is True
+    assert iface.methods[0].is_abstract is True
+    assert isinstance(worker, A.ClassDecl)
+    assert worker.interfaces == ["Tickable", "Runnable"]
+    assert worker.fields[0].access == "private"
+    assert worker.methods[0].access == "protected"
+
+
 def test_for_with_filter():
     prog = parse_src("for (N : 0..9, N > 2):\n    Print(N)\n")
     stmt = prog.body[0]

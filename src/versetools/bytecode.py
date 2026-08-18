@@ -113,12 +113,15 @@ class FunctionProto:
     effects: list[str]
     chunk: Chunk
     is_method: bool = False
+    access: str = "public"
+    is_abstract: bool = False
 
 
 @dataclass
 class FieldSpec:
     name: str
     default_chunk: "Chunk | None"
+    access: str = "public"
 
 
 @dataclass
@@ -127,3 +130,5 @@ class ClassSpec:
     base: "str | None"
     fields: list[FieldSpec]
     methods: list[FunctionProto]
+    interfaces: list[str] = field(default_factory=list)
+    is_abstract: bool = False

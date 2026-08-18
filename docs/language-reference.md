@@ -253,13 +253,26 @@ circle := class(shape):
 
 C := circle{Name := "c1", Radius := 2.0}
 Print(C.Describe())    # dynamic dispatch calls circle's Area()
+
+renderable := class<abstract>:
+    Render<abstract>() : void =
+
+sprite := class(shape) : renderable:
+    Secret<private> : string = "x"
+    Render<public>() : void =
+        Print(self.Secret)
 ```
 
 - `ClassName := class:` / `ClassName := class(BaseName):` declares a
-  class (single inheritance only). The base class must already be
-  declared above it in the file.
+  class; `ClassName := class(BaseName) : Interface1, Interface2:`
+  additionally lists implemented interfaces. The base class must already
+  be declared above it in the file.
 - Fields declare a name, a type annotation, and/or a default value
   expression (evaluated fresh per instance).
+- Classes and members can include `<abstract>` and one access specifier
+  (`<public>`, `<private>`, `<protected>`). Access and
+  interface/abstract override rules are validated by the strict checker
+  (`verse check` / `verse run --strict`).
 - `ClassName{Field := Value, ...}` constructs an instance; omitted
   fields take their declared default.
 - Methods are ordinary function declarations inside the class body;
