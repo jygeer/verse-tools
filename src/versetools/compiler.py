@@ -89,11 +89,22 @@ class Compiler:
     # Functions
     # ==================================================================
     def _compile_function_proto(
-        self, name: str, params: list[A.Param], effects: list[str], body: A.Block
+        self,
+        name: str,
+        params: list[A.Param],
+        effects: list[str],
+        body: A.Block,
+        *,
+        access: str = "public",
+        is_abstract: bool = False,
     ) -> FunctionProto:
         chunk = Chunk(name=name)
         ctx = _FuncCtx(chunk, decides_context=("decides" in effects))
-        self._compile_function_body(body, ctx)
+        if is_abstract:
+            chunk.emit(Op.LOAD_CONST, chunk.add_const(VOID))
+            chunk.emit(Op.RETURN)
+        else:
+            self._compile_function_body(body, ctx)
         param_specs = [
             ParamSpec(
                 name=p.name,
@@ -101,7 +112,14 @@ class Compiler:
             )
             for p in params
         ]
-        return FunctionProto(name=name, params=param_specs, effects=list(effects), chunk=chunk)
+        return FunctionProto(
+            name=name,
+            params=param_specs,
+            effects=list(effects),
+            chunk=chunk,
+            access=access,
+            is_abstract=is_abstract,
+        )
 
     def _compile_function_body(self, block: A.Block, ctx: _FuncCtx):
         """Compile a function body so that the value of a trailing bare
@@ -333,12 +351,26 @@ class Compiler:
                 default_chunk = self._compile_expr_as_chunk(f.default)
             else:
                 default_chunk = self._const_chunk(_default_for_type(f.type_ann))
-            field_specs.append(FieldSpec(name=f.name, default_chunk=default_chunk))
+            field_specs.append(FieldSpec(name=f.name, default_chunk=default_chunk, access=f.access))
         methods = [
-            self._compile_function_proto(m.name, m.params, m.effects, m.body)
+            self._compile_function_proto(
+                m.name,
+                m.params,
+                m.effects,
+                m.body,
+                access=m.access,
+                is_abstract=m.is_abstract,
+            )
             for m in node.methods
         ]
-        spec = ClassSpec(name=node.name, base=node.base, fields=field_specs, methods=methods)
+        spec = ClassSpec(
+            name=node.name,
+            base=node.base,
+            fields=field_specs,
+            methods=methods,
+            interfaces=node.interfaces,
+            is_abstract=node.is_abstract,
+        )
         ctx.emit(Op.MAKE_CLASS, spec, node.line)
         ctx.emit(Op.STORE_NAME, node.name, node.line)
 

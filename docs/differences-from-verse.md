@@ -73,11 +73,14 @@ in the architecture doc; out of scope for this subset.)
 
 ## Classes are simpler
 
-- Single inheritance only - `class(Base)`, no multiple base
-  classes/mixins/interfaces.
-- No access specifiers (`<public>`/`<private>`/...) - everything is
-  accessible from anywhere.
-- No abstract methods/classes.
+- Single inheritance only for concrete bases (`class(Base)`), but class
+  headers can now also list multiple interfaces
+  (`class(Base) : Interface1, Interface2:`).
+- Access specifiers and abstractness are supported with class/member
+  specifiers (`<public>`, `<private>`, `<protected>`, `<abstract>`), but
+  **compile-time** access/interface/abstract enforcement currently
+  happens in strict mode (`verse check` / `verse run --strict`), not in
+  plain dynamic `verse run`.
 - The base class must be declared textually earlier in the same file
   (no forward references, no multi-file resolution - see below).
 - Class instance equality is Python object identity (`VInstance` doesn't

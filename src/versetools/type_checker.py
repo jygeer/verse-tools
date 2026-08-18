@@ -33,8 +33,13 @@ from .type_system import (
 class ClassInfo:
     name: str
     base: str | None
+    interfaces: list[str] = field(default_factory=list)
+    is_abstract: bool = False
     fields: dict[str, Type] = field(default_factory=dict)
     methods: dict[str, FunctionType | Type] = field(default_factory=dict)
+    field_access: dict[str, str] = field(default_factory=dict)
+    method_access: dict[str, str] = field(default_factory=dict)
+    abstract_methods: set[str] = field(default_factory=set)
 
 
 def check_program(program: A.Program) -> None:
@@ -47,6 +52,7 @@ class TypeChecker:
         self.classes: dict[str, ClassInfo] = {}
         self.current_return_type: Type = UNKNOWN
         self.current_allows_failure = False
+        self.current_class_name: str | None = None
         # Maps function name -> frozenset of declared effect strings, populated bottom-up
         # so that callers can check whether a callee is <decides> etc.
         self._func_effects: dict[str, frozenset[str]] = {}
@@ -83,7 +89,12 @@ class TypeChecker:
     def _declare_top_level(self, program: A.Program):
         for stmt in program.body:
             if isinstance(stmt, A.ClassDecl):
-                self.classes[stmt.name] = ClassInfo(name=stmt.name, base=stmt.base)
+                self.classes[stmt.name] = ClassInfo(
+                    name=stmt.name,
+                    base=stmt.base,
+                    interfaces=list(stmt.interfaces),
+                    is_abstract=stmt.is_abstract,
+                )
                 self.scopes[0][stmt.name] = ClassType(stmt.name)
         for stmt in program.body:
             if isinstance(stmt, A.ClassDecl):
@@ -97,11 +108,18 @@ class TypeChecker:
         info = self.classes[node.name]
         if info.base is not None and info.base not in self.classes:
             raise VerseCompileError(f"unknown base class '{info.base}'", node.line)
+        for iface in info.interfaces:
+            if iface not in self.classes:
+                raise VerseCompileError(f"unknown interface '{iface}'", node.line)
         for field in node.fields:
             field_type = self._declared_or_inferred_type(field.type_ann, field.default, field.line)
             info.fields[field.name] = field_type
+            info.field_access[field.name] = field.access
         for method in node.methods:
             info.methods[method.name] = self._function_type(method.params, method.return_type, method.line)
+            info.method_access[method.name] = method.access
+            if method.is_abstract:
+                info.abstract_methods.add(method.name)
 
     def _function_type(self, params: list[A.Param], return_type: str | None, line: int) -> Type:
         param_types = tuple(self._type_from_ann(p.type_ann, p.line) for p in params)
@@ -252,12 +270,16 @@ class TypeChecker:
                 stmt.line,
             )
 
-    def _check_function(self, node: A.FuncDecl, self_type: Type | None = None):
+    def _check_function(
+        self, node: A.FuncDecl, self_type: Type | None = None, owning_class: str | None = None
+    ):
         previous_return_type = self.current_return_type
         previous_allows_failure = self.current_allows_failure
+        previous_class_name = self.current_class_name
         fn_type = self._lookup(node.name, node.line) if self_type is None else None
         self.current_return_type = fn_type.return_type if isinstance(fn_type, FunctionType) else self._type_from_ann(node.return_type, node.line)
         self.current_allows_failure = "decides" in node.effects
+        self.current_class_name = owning_class
         self._push_scope()
         if self_type is not None:
             self._define("self", self_type)
@@ -283,6 +305,7 @@ class TypeChecker:
         self._pop_scope()
         self.current_return_type = previous_return_type
         self.current_allows_failure = previous_allows_failure
+        self.current_class_name = previous_class_name
 
     def _check_implicit_return(self, node: A.FuncDecl):
         if not node.body.statements:
@@ -327,9 +350,33 @@ class TypeChecker:
                         f"cannot assign {format_type(default_type)} to {format_type(field_type)}",
                         field.line,
                     )
+        if not info.is_abstract and info.abstract_methods:
+            raise VerseCompileError(
+                f"class '{node.name}' must be abstract because it declares abstract method(s): "
+                + ", ".join(sorted(info.abstract_methods)),
+                node.line,
+            )
         self_type = ClassType(node.name)
         for method in node.methods:
-            self._check_function(method, self_type=self_type)
+            if method.is_abstract:
+                continue
+            self._check_function(method, self_type=self_type, owning_class=node.name)
+        if not info.is_abstract:
+            missing = self._collect_unimplemented_abstract_methods(node.name)
+            if missing:
+                missing_list = ", ".join(sorted(missing))
+                raise VerseCompileError(
+                    f"class '{node.name}' must override abstract method(s): {missing_list}",
+                    node.line,
+                )
+            for iface in info.interfaces:
+                missing_iface = self._missing_interface_methods(node.name, iface)
+                if missing_iface:
+                    missing_list = ", ".join(sorted(missing_iface))
+                    raise VerseCompileError(
+                        f"class '{node.name}' does not implement interface '{iface}': {missing_list}",
+                        node.line,
+                    )
 
     def _collect_clause_bindings(self, clauses: list[A.IfClause]) -> dict[str, Type]:
         bindings = {}
@@ -744,11 +791,15 @@ class TypeChecker:
                 return UNKNOWN
             raise VerseCompileError(f"task has no member '{name}'", line)
         if isinstance(obj_type, ClassType):
-            field_type = self._class_field_type(obj_type.name, name, line, required=False)
-            if field_type is not None:
+            field_info = self._class_field_info(obj_type.name, name)
+            if field_info is not None:
+                field_type, access, owner = field_info
+                self._ensure_member_access(owner, access, name, line)
                 return field_type
-            method_type = self._class_method_type(obj_type.name, name)
-            if method_type is not None:
+            method_info = self._class_method_info(obj_type.name, name)
+            if method_info is not None:
+                method_type, access, owner, _ = method_info
+                self._ensure_member_access(owner, access, name, line)
                 if for_assignment:
                     raise VerseCompileError(f"method '{name}' is not assignable", line)
                 return method_type
@@ -757,23 +808,86 @@ class TypeChecker:
             return UNKNOWN
         raise VerseCompileError(f"type {format_type(obj_type)} has no member '{name}'", line)
 
-    def _class_field_type(self, class_name: str, field_name: str, line: int, required: bool = True) -> Type | None:
+    def _ensure_member_access(self, owner: str, access: str, name: str, line: int):
+        if access == "public":
+            return
+        current = self.current_class_name
+        if access == "private":
+            if current == owner:
+                return
+            raise VerseCompileError(f"member '{name}' is private in class '{owner}'", line)
+        if access == "protected":
+            if current == owner or (current is not None and self._is_subclass(current, owner)):
+                return
+            raise VerseCompileError(f"member '{name}' is protected in class '{owner}'", line)
+        raise VerseCompileError(f"unknown access specifier '{access}'", line)
+
+    def _class_field_info(self, class_name: str, field_name: str) -> tuple[Type, str, str] | None:
         info = self.classes[class_name]
         if field_name in info.fields:
-            return info.fields[field_name]
+            return info.fields[field_name], info.field_access.get(field_name, "public"), class_name
         if info.base is not None:
-            return self._class_field_type(info.base, field_name, line, required)
+            return self._class_field_info(info.base, field_name)
+        return None
+
+    def _class_field_type(self, class_name: str, field_name: str, line: int, required: bool = True) -> Type | None:
+        info = self._class_field_info(class_name, field_name)
+        if info is not None:
+            return info[0]
         if required:
             raise VerseCompileError(f"class '{class_name}' has no field '{field_name}'", line)
         return None
 
-    def _class_method_type(self, class_name: str, method_name: str) -> FunctionType | Type | None:
+    def _class_method_info(
+        self, class_name: str, method_name: str
+    ) -> tuple[FunctionType | Type, str, str, bool] | None:
         info = self.classes[class_name]
         if method_name in info.methods:
-            return info.methods[method_name]
+            return (
+                info.methods[method_name],
+                info.method_access.get(method_name, "public"),
+                class_name,
+                method_name in info.abstract_methods,
+            )
         if info.base is not None:
-            return self._class_method_type(info.base, method_name)
+            return self._class_method_info(info.base, method_name)
         return None
+
+    def _class_method_type(self, class_name: str, method_name: str) -> FunctionType | Type | None:
+        info = self._class_method_info(class_name, method_name)
+        return info[0] if info is not None else None
+
+    def _collect_unimplemented_abstract_methods(self, class_name: str) -> set[str]:
+        info = self.classes[class_name]
+        required: set[str] = set()
+        if info.base is not None:
+            required |= self._collect_unimplemented_abstract_methods(info.base)
+        required |= set(info.abstract_methods)
+        for method_name in info.methods:
+            if method_name in info.abstract_methods:
+                continue
+            required.discard(method_name)
+        return required
+
+    def _missing_interface_methods(self, class_name: str, interface_name: str) -> set[str]:
+        iface_info = self.classes[interface_name]
+        missing: set[str] = set()
+        for method_name, iface_method_type in iface_info.methods.items():
+            method_info = self._class_method_info(class_name, method_name)
+            if method_info is None or method_info[3]:
+                missing.add(method_name)
+                continue
+            impl_method_type = method_info[0]
+            if isinstance(iface_method_type, FunctionType) and isinstance(impl_method_type, FunctionType):
+                compatible = self._is_assignable(impl_method_type, iface_method_type) and self._is_assignable(
+                    iface_method_type, impl_method_type
+                )
+                if not compatible:
+                    missing.add(method_name)
+                    continue
+            elif iface_method_type != impl_method_type:
+                missing.add(method_name)
+        return missing
 
     def _iterable_item_type(self, iterable_type: Type, line: int) -> Type:
         if isinstance(iterable_type, ArrayType):

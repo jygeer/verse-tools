@@ -351,36 +351,100 @@ class Parser:
         return params
 
     def _parse_effect_list(self) -> list[str]:
-        effects = []
+        return self._parse_specifier_list()
+
+    def _parse_specifier_list(self) -> list[str]:
+        values = []
         while self._check(T.LT):
             self._advance()
             while True:
-                effects.append(self._expect(T.IDENT).value)
+                values.append(self._expect(T.IDENT).value)
                 if not self._match(T.COMMA):
                     break
             self._expect(T.GT)
-        return effects
+        return values
+
+    def _parse_access_and_abstract(
+        self, specifiers: list[str], line: int, *, allow_abstract: bool
+    ) -> tuple[str, bool]:
+        access = "public"
+        access_seen = False
+        is_abstract = False
+        for spec in specifiers:
+            if spec in {"public", "private", "protected"}:
+                if access_seen:
+                    raise VerseSyntaxError("duplicate access specifier", line)
+                access_seen = True
+                access = spec
+                continue
+            if spec == "abstract":
+                if not allow_abstract:
+                    raise VerseSyntaxError("abstract is not allowed here", line)
+                is_abstract = True
+                continue
+            raise VerseSyntaxError(f"unknown class/member specifier '{spec}'", line)
+        return access, is_abstract
 
     def _parse_class_decl(self, name: str, line: int) -> A.ClassDecl:
         self._advance()  # 'class'
+        class_access, is_abstract = self._parse_access_and_abstract(
+            self._parse_specifier_list(), line, allow_abstract=True
+        )
+        if class_access != "public":
+            raise VerseSyntaxError("class declarations do not support access specifiers", line)
         base = None
         if self._match(T.LPAREN):
             base = self._expect(T.IDENT).value
             self._expect(T.RPAREN)
+        interfaces: list[str] = []
         self._expect(T.COLON)
+        if not self._check(T.NEWLINE):
+            while True:
+                interfaces.append(self._expect(T.IDENT).value)
+                if not self._match(T.COMMA):
+                    break
+            self._expect(T.COLON)
         self._expect_stmt_end()
         self._expect(T.INDENT)
         fields: list[A.FieldDecl] = []
         methods: list[A.FuncDecl] = []
         self._skip_newlines()
         while not self._check(T.DEDENT):
-            member_start = self.pos
-            fn = self._try_parse_func_decl()
-            if fn is not None:
-                methods.append(fn)
+            member_name_tok = self._expect(T.IDENT)
+            member_specs = self._parse_specifier_list()
+            member_access, member_is_abstract = self._parse_access_and_abstract(
+                member_specs, member_name_tok.line, allow_abstract=True
+            )
+            if self._match(T.LPAREN):
+                params = self._parse_param_list()
+                self._expect(T.RPAREN)
+                effects = self._parse_effect_list()
+                return_type = None
+                if self._match(T.COLON):
+                    return_type = self._parse_type()
+                self._expect(T.ASSIGN)
+                body = (
+                    A.Block(statements=[], line=member_name_tok.line)
+                    if member_is_abstract and self._check(T.NEWLINE)
+                    else self._parse_block()
+                )
+                if member_is_abstract and body.statements:
+                    raise VerseSyntaxError(
+                        "abstract methods cannot have a body", member_name_tok.line
+                    )
+                methods.append(
+                    A.FuncDecl(
+                        name=member_name_tok.value,
+                        params=params,
+                        effects=effects,
+                        return_type=return_type,
+                        body=body,
+                        access=member_access,
+                        is_abstract=member_is_abstract,
+                        line=member_name_tok.line,
+                    )
+                )
             else:
-                self.pos = member_start
-                fname_tok = self._expect(T.IDENT)
                 type_ann = None
                 if self._match(T.COLON):
                     type_ann = self._parse_type()
@@ -388,17 +452,28 @@ class Parser:
                 if self._match(T.ASSIGN):
                     default = self.parse_expression()
                 self._expect_stmt_end()
+                if member_is_abstract:
+                    raise VerseSyntaxError("fields cannot be abstract", member_name_tok.line)
                 fields.append(
                     A.FieldDecl(
-                        name=fname_tok.value,
+                        name=member_name_tok.value,
                         type_ann=type_ann,
                         default=default,
-                        line=fname_tok.line,
+                        access=member_access,
+                        line=member_name_tok.line,
                     )
                 )
             self._skip_newlines()
         self._expect(T.DEDENT)
-        return A.ClassDecl(name=name, base=base, fields=fields, methods=methods, line=line)
+        return A.ClassDecl(
+            name=name,
+            base=base,
+            interfaces=interfaces,
+            fields=fields,
+            methods=methods,
+            is_abstract=is_abstract,
+            line=line,
+        )
 
     # -- types ----------------------------------------------------
     def _parse_type(self) -> str:

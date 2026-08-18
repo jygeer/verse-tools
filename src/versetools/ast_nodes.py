@@ -226,6 +226,8 @@ class FuncDecl(Stmt):
     effects: list[str]
     return_type: str | None
     body: Block
+    access: str = "public"
+    is_abstract: bool = False
     line: int = 0
 
 
@@ -234,6 +236,7 @@ class FieldDecl:
     name: str
     type_ann: str | None
     default: Expr | None
+    access: str = "public"
     line: int = 0
 
 
@@ -241,8 +244,10 @@ class FieldDecl:
 class ClassDecl(Stmt):
     name: str
     base: str | None
+    interfaces: list[str]
     fields: list[FieldDecl]
     methods: list[FuncDecl]
+    is_abstract: bool = False
     line: int = 0
 
 

@@ -151,12 +151,24 @@ class VRange:
 
 
 class VClass:
-    def __init__(self, name: str, base: "VClass | None", field_specs, methods: dict, closure_env):
+    def __init__(
+        self,
+        name: str,
+        base: "VClass | None",
+        field_specs,
+        methods: dict,
+        closure_env,
+        *,
+        interfaces: list[str] | None = None,
+        is_abstract: bool = False,
+    ):
         self.name = name
         self.base = base
         self.field_specs = field_specs  # list[(name, default_chunk_or_None)]
         self.methods = methods  # name -> VFunction
         self.closure_env = closure_env
+        self.interfaces = list(interfaces or [])
+        self.is_abstract = is_abstract
 
     def all_field_specs(self):
         specs = [] if self.base is None else self.base.all_field_specs()

@@ -241,6 +241,29 @@ def test_class_fields_methods_inheritance(runner):
     assert runner.output == "12.0\ns"
 
 
+def test_abstract_method_call_raises_runtime_error(runner):
+    with pytest.raises(VerseRuntimeError, match="abstract method"):
+        runner.run(
+            "Shape := class<abstract>:\n"
+            "    Area<abstract>() : float =\n"
+            "Square := class(Shape):\n"
+            "    Side : float = 2.0\n"
+            "Main() : void =\n"
+            "    S := Square{}\n"
+            "    Print(ToString(S.Area()))\n"
+            "Main()\n"
+        )
+
+
+def test_instantiating_abstract_class_raises_runtime_error(runner):
+    with pytest.raises(VerseRuntimeError, match="abstract class"):
+        runner.run(
+            "Shape := class<abstract>:\n"
+            "    Area<abstract>() : float =\n"
+            "S := Shape{}\n"
+        )
+
+
 def test_nested_class_field_default_captures_declaring_scope(runner):
     runner.run(
         'Make() : void =\n'
